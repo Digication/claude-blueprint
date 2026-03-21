@@ -93,9 +93,22 @@ Not every app needs infrastructure. Determine the deployment tier first, then ap
 
 | Signal | Tier | What to do |
 |---|---|---|
-| "prototype", "local only", "just for me", "demo", no mention of deployment | **Local only** | No infra needed. Add Docker Compose for reproducible local dev if useful. |
+| "prototype", "local only", "just for me", "demo", no mention of deployment | **Local only** | No cloud infra needed. Add Docker Compose for reproducible local dev if useful. |
 | "deploy", "production", "share with team", "users will access" | **Deployed** | Add infrastructure + CI/CD phases to the plan. |
 | Unclear | **Ask the user** | "Do you need this deployed to the cloud, or is local-only fine for now?" |
+
+### Docker Development Environment
+
+For any tier, consider adding a Docker-based dev environment when the app has system-level dependencies (databases, browsers, native tools) or when a one-command reproducible setup benefits the team.
+
+| Signal | Docker? | Notes |
+|---|---|---|
+| Any app (frontend, backend, fullstack) | **Yes** (default) | Consistent Node.js, pnpm, and build environment across the team |
+| System dependencies (DB, Playwright browsers, native libs) | **Yes** | Containerize to avoid manual setup |
+| Team includes non-technical users or onboarding is frequent | **Yes** | Add convenience scripts (`.command` files) |
+| User explicitly says no Docker | **No** | Respect the preference |
+
+When adding Docker, include a dedicated **Docker phase** in the plan. See [DOCKER.md](references/DOCKER.md) for templates covering frontend-only, backend-only, and fullstack apps, plus convenience scripts and best practices.
 
 ### Infrastructure Preferences (when deployed)
 
@@ -194,6 +207,7 @@ See [TESTING_PHASES.md](references/TESTING_PHASES.md) for dependency graph and d
 - [ ] The execution guide includes **troubleshooting** for likely failure modes
 - [ ] Plan includes a **unit test phase** covering all new backend/logic code
 - [ ] Plan includes an **E2E test phase** as the final phase if the feature has UI
+- [ ] Plan includes a **Docker phase** if the app has system dependencies or the user requests it
 
 ---
 
