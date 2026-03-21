@@ -2,7 +2,7 @@
 name: skill-review
 description: Reviews and validates Claude skills against best practices. Use when asked to review a skill, audit skill quality, validate SKILL.md files, or improve existing skills.
 metadata:
-  allowed-tools: Read, Glob, Grep
+  allowed-tools: Read, Write, Edit, Glob, Grep
 ---
 
 # Skill Review Guide
@@ -77,3 +77,12 @@ See [CHECKLIST.md](references/CHECKLIST.md) for the complete quality checklist.
 ## Strengths
 [What the skill does well]
 ```
+
+### Step 6: Self-Critique
+
+After generating the feedback report, turn the lens on yourself. Follow the [SELF_CRITIQUE.md](references/SELF_CRITIQUE.md) protocol:
+
+1. Reflect on whether your checklist and references caught everything — or if you relied on intuition
+2. Check for blind spots in your own references
+3. If a gap is found, propose a specific update to your own reference files
+4. Ask for user approval before self-modifying

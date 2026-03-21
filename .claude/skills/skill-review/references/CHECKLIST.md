@@ -22,6 +22,15 @@
 - [ ] Step-by-step workflows for complex tasks
 - [ ] No time-sensitive information
 
+## Decision Logic (if skill contains decision tables or matrices)
+
+- [ ] Decision tables cover all valid input combinations (no gaps)
+- [ ] Decision tables specify evaluation order (e.g., "first match wins")
+- [ ] Variable/template references are authoritative mappings, not just examples
+- [ ] Override logic is explicit (what overrides what, and when)
+- [ ] Safety/posture/tier derived independently where appropriate (not coupled)
+- [ ] "Other"/freeform input handling is specified
+
 ## Scripts (if present)
 
 - [ ] Explicit error handling
