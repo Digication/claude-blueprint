@@ -14,6 +14,7 @@ Interactive wizard that configures Claude Code based on who you are and how you 
 - (no args): Run the full onboarding wizard (or re-onboard if profile exists)
 - `level-up`: Skip straight to re-picking your comfort level (same as choosing "Level up" in Step 0)
 - `reset`: Overwrite onboard sections in `~/.claude/CLAUDE.md` with fresh answers
+- `clear`: Remove all onboard sections and reset output style to Default — return to vanilla Claude Code
 - `show`: Display current profile without changes
 
 ## Workflow
@@ -33,11 +34,23 @@ Interactive wizard that configures Claude Code based on who you are and how you 
        | Level up | Change your comfort level — just re-pick how Claude works with you (keeps purpose and style) |
        | Update everything | Re-run the full wizard to change all settings |
        | Start fresh | Clear onboard sections and set up from scratch |
+       | Remove profile | Go back to default Claude Code — remove all personalization |
        | Keep it | No changes — exit onboarding |
    - **If "Level up"**: Jump to Step 1a (Quick Re-tier)
    - **If "Update everything"**: Proceed to Step 1
    - **If "Start fresh"**: Clear onboard sections, proceed to Step 1
+   - **If "Remove profile"**: Jump to Clear Profile (below)
 3. If `reset` argument was passed, skip the question and proceed to Step 1
+4. If `clear` argument was passed, jump to Clear Profile (below)
+
+### Clear Profile
+
+Remove all onboard-generated sections from `~/.claude/CLAUDE.md` (everything between `<!-- onboard:* -->` markers). Preserve any user-added sections. If no user-added sections remain, delete the file.
+
+Also clean up output style:
+- Delete the installed output style file from `~/.claude/output-styles/` (whichever one was installed: `beginner.md`, `supported.md`, `standard.md`, or `expert.md`)
+- Remove `"outputStyle"` from `~/.claude/settings.json` (or set to `""`)
+- Tell the user: "Profile removed. Claude Code is back to default. Run `/onboard` anytime to set up again."
 
 ### Step 1a — Quick Re-tier (Level Up)
 
@@ -120,12 +133,12 @@ See [SAFETY_DEFAULTS.md](references/SAFETY_DEFAULTS.md) for what each posture co
 
 Based on the profile tier (from [PROFILES.md](references/PROFILES.md)), auto-select the output style:
 
-| Profile Tier | Output Style | settings.json value | Why |
+| Profile Tier | Output Style | Template Source | settings.json value |
 |---|---|---|---|
-| **Guided** | `Beginner-Friendly` | `"outputStyle": "Beginner-Friendly"` | System-prompt level plain language, risk explanations, analogies |
-| **Supported** | `Explanatory` | `"outputStyle": "Explanatory"` | Educational insights woven into work |
-| **Standard** | `Default` | Remove `outputStyle` key or set `""` | Standard concise engineering mode |
-| **Expert** | `Default` | Remove `outputStyle` key or set `""` | CLAUDE.md "be concise" handles the rest |
+| **Guided** | `Beginner-Friendly` | [OUTPUT_STYLE_BEGINNER.md](references/OUTPUT_STYLE_BEGINNER.md) | `"outputStyle": "Beginner-Friendly"` |
+| **Supported** | `Supported` | [OUTPUT_STYLE_SUPPORTED.md](references/OUTPUT_STYLE_SUPPORTED.md) | `"outputStyle": "Supported"` |
+| **Standard** | `Standard` | [OUTPUT_STYLE_STANDARD.md](references/OUTPUT_STYLE_STANDARD.md) | `"outputStyle": "Standard"` |
+| **Expert** | `Expert` | [OUTPUT_STYLE_EXPERT.md](references/OUTPUT_STYLE_EXPERT.md) | `"outputStyle": "Expert"` |
 
 The output style modifies Claude's **system prompt** — more effective than CLAUDE.md alone for changing communication behavior. Both work together: output style controls *how* Claude communicates, CLAUDE.md controls *what* Claude knows about you.
 
@@ -174,7 +187,8 @@ Header: "Your Profile"
    - Replace only the onboard-generated sections
 2. If it doesn't exist, create it
 3. All onboard-generated sections must start with `<!-- onboard:section-name -->` HTML comment so future runs can identify and replace them
-4. **Set the output style** in `~/.claude/settings.json`:
+4. **Install output style**: Copy the template from the matching `OUTPUT_STYLE_*.md` reference to `~/.claude/output-styles/` (create directory if needed)
+5. **Set the output style** in `~/.claude/settings.json`:
    - Read existing settings (if any) and merge — don't overwrite other settings
    - Set `"outputStyle"` to the value from Step 4b
    - Tell the user: "Output style set to [name]. This takes effect in your next session."

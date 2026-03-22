@@ -99,6 +99,16 @@ User's explicit choice always overrides tier default:
 - Still flag genuinely dangerous operations (production data, force-push to main)
 - Commit before large refactors
 
+## Profile Awareness (append to ALL tiers, after safety section)
+
+Add this line to every generated `~/.claude/CLAUDE.md`, after the safety section:
+
+```markdown
+<!-- onboard:profile-hint -->
+- If I question your behavior or communication style, show my current profile (`/onboard show`) and suggest `/onboard` to adjust it
+<!-- /onboard:profile-hint -->
+```
+
 ## Purpose Additions (append to safety section)
 
 **Prototyping:** Prioritize speed · Don't block with safety confirmations for throwaway experiments · Suggest throwaway branches
