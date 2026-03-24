@@ -7,11 +7,16 @@ metadata:
 
 # Onboard — Personalized Claude Code Setup
 
-Interactive wizard that configures Claude Code based on who you are and how you work. Generates `~/.claude/CLAUDE.md` with personalized instructions, `.claude/user-context.md` with per-project preferences (gitignored), and sets the appropriate output style so every future conversation is tailored to you.
+Interactive wizard that configures Claude Code based on who you are and how you work. Handles two scopes:
+
+- **Global** (`~/.claude/CLAUDE.md`): Who you are, how you communicate, safety posture — shared across all projects
+- **Project** (`.claude/user-context.md`): What you're building here — project-specific and gitignored
+
+Automatically detects which setup is missing and runs only what's needed.
 
 ## Arguments
 
-- (no args): Run the full onboarding wizard (or re-onboard if profile exists)
+- (no args): Auto-detect what's missing and run global setup, project setup, or both
 - `level-up`: Skip straight to re-picking your comfort level (same as choosing "Level up" in Step 0)
 - `reset`: Overwrite onboard sections in `~/.claude/CLAUDE.md` with fresh answers
 - `clear`: Remove all onboard sections and reset output style to Default — return to vanilla Claude Code
@@ -20,30 +25,43 @@ Interactive wizard that configures Claude Code based on who you are and how you 
 
 ## Workflow
 
-### Step 0 — Check Existing Profile
+### Step 0 — Detect Mode
 
-1. Check if `~/.claude/CLAUDE.md` exists
-2. If it exists and has a `<!-- onboard:about-me -->` marker (check for the HTML comment, NOT the `## About Me` heading — Expert profiles have empty About Me content):
-   - Parse the current profile: detect the tier by matching the `<!-- onboard:about-me -->` section content against the About Me templates in PROFILES.md. For tier detection: "new to coding" → Guided, "building my skills" → Supported, "comfortable with code" → Standard, empty/minimal content → Expert.
-   - Show the current profile summary including the detected tier
-   - If `show` argument was passed, also scan the memory directory (see Memory Summary below), display both profile and memory summary, then stop
-   - Use **AskUserQuestion** to ask: "You're currently set to: [detected tier]. What would you like to do?"
-     - Header: "Profile"
-     - Options:
-       | Option | Description |
-       |---|---|
-       | Level up | Change your comfort level — just re-pick how Claude works with you (keeps purpose and style) |
-       | Update everything | Re-run the full wizard to change all settings |
-       | Start fresh | Clear onboard sections and set up from scratch |
-       | Remove profile | Go back to default Claude Code — remove all personalization |
-       | Keep it | No changes — exit onboarding |
-   - **If "Level up"**: Jump to Step 1a (Quick Re-tier)
-   - **If "Update everything"**: Proceed to Step 1
-   - **If "Start fresh"**: Clear onboard sections, proceed to Step 1
-   - **If "Remove profile"**: Jump to Clear Profile (below)
-3. If `reset` argument was passed, skip the question and proceed to Step 1
-4. If `clear` argument was passed, jump to Clear Profile (below)
-5. If `memory` argument was passed, jump to Memory Summary → `memory` Workflow (below)
+**Subcommand routing** — check these first, before mode detection:
+- `show` argument: display profile and memory summary (see Memory Summary), then stop
+- `reset` argument: skip to Global Flow (treat as global-only or full depending on project file state)
+- `clear` argument: jump to Clear Profile
+- `level-up` argument: jump to Step 1a
+- `memory` argument: jump to Memory Summary → `memory` Workflow
+
+**Mode detection** — check two conditions independently:
+- **has_global**: `~/.claude/CLAUDE.md` exists AND contains `<!-- onboard:about-me -->` marker (check for the HTML comment, NOT the `## About Me` heading — Expert profiles have empty About Me content)
+- **has_project**: `.claude/user-context.md` exists AND contains `<!-- onboard:tier -->` marker
+
+| has_global | has_project | Mode |
+|---|---|---|
+| false | false | **full** — run Global Flow then Project Flow |
+| false | true | **global-only** — run Global Flow only |
+| true | false | **project-only** — run Project Flow only |
+| true | true | **existing** — show current profile, offer update options |
+
+**For `existing` mode:**
+- Parse the current profile: detect the tier by matching the `<!-- onboard:about-me -->` section content against the About Me templates in PROFILES.md. For tier detection: "new to coding" → Guided, "building my skills" → Supported, "comfortable with code" → Standard, empty/minimal content → Expert.
+- Show the current profile summary including the detected tier
+- Use **AskUserQuestion** to ask: "You're currently set to: [detected tier]. What would you like to do?"
+  - Header: "Profile"
+  - Options:
+    | Option | Description |
+    |---|---|
+    | Level up | Change your comfort level — just re-pick how Claude works with you (keeps purpose and style) |
+    | Update everything | Re-run the full wizard to change all settings |
+    | Start fresh | Clear onboard sections and set up from scratch |
+    | Remove profile | Go back to default Claude Code — remove all personalization |
+    | Keep it | No changes — exit onboarding |
+  - **If "Level up"**: Jump to Step 1a (Quick Re-tier)
+  - **If "Update everything"**: Proceed to Global Flow (mode = full)
+  - **If "Start fresh"**: Clear onboard sections, proceed to Global Flow (mode = full)
+  - **If "Remove profile"**: Jump to Clear Profile
 
 ### Clear Profile
 
@@ -74,10 +92,16 @@ After the user picks:
 1. Re-derive safety posture using the new tier + existing purpose (from `.claude/user-context.md`) + existing style (from current `~/.claude/CLAUDE.md`)
 2. Re-derive output style from the new tier
 3. Delete the old output style file from `~/.claude/output-styles/` (identify from current `settings.json` `outputStyle` value → map to filename)
-4. Regenerate all onboard sections using new tier but **preserve existing Step 2/3 values** (purpose from project file, style from global CLAUDE.md)
-5. Jump to Step 5 (Preview and confirm)
+4. Regenerate all onboard sections using new tier but **preserve existing purpose/style values** (purpose from project file, style from global CLAUDE.md)
+5. Jump to Step 5 (Preview and confirm), mode = global-only
 
-### Step 1 — Coding Comfort
+---
+
+## Global Flow
+
+Runs when `has_global` is false, or when "Update everything" / "Start fresh" is chosen from existing mode.
+
+### Step G1 — Coding Comfort
 
 **AskUserQuestion: "How would you like Claude to work with you?"**
 Header: "Coding Comfort"
@@ -89,22 +113,9 @@ Header: "Coding Comfort"
 | Work alongside me | **Standard** | I'm comfortable with code — just flag what's non-obvious or risky |
 | Stay out of my way | **Expert** | I know what I'm doing — be fast and concise |
 
-This is the **primary question** — it directly determines the profile tier, safety posture, and output style. Any user at any skill level can pick any option. A senior dev exploring a new tool might choose "Guide me." A designer who's been vibe-coding for months might choose "Stay out of my way." Respect their choice.
+This is the **primary question** — it directly determines the profile tier, safety posture, and output style. Any user at any skill level can pick any option.
 
-### Step 2 — Purpose (project-scoped)
-
-**AskUserQuestion: "What will you mainly use Claude Code for in this project?"**
-Header: "Purpose"
-
-| Option | Description |
-|---|---|
-| Prototyping | Quick experiments and exploring ideas — speed over polish |
-| Learning | Understanding code, following tutorials, building skills |
-| Production | Real projects that need quality, testing, and reliability |
-
-> **Storage:** Purpose is saved to `.claude/user-context.md` (project-level, gitignored) — not to the global `~/.claude/CLAUDE.md`. Different projects can have different purposes. The same user might prototype in one repo and do production work in another.
-
-### Step 3 — Communication Style
+### Step G2 — Communication Style
 
 **AskUserQuestion: "How should Claude communicate with you?"**
 Header: "Style"
@@ -116,9 +127,49 @@ Header: "Style"
 | Explain risky things | Only explain when something could go wrong |
 | Be concise | Short answers — I'll ask if I need more detail |
 
-### Step 4 — Determine Safety Posture
+### Step G3 — Determine Output Style
 
-Based on the answers from Steps 1–3, **auto-select** the safety posture. Do NOT ask a separate question — derive it from the profile.
+Based on the profile tier (from [PROFILES.md](references/PROFILES.md)), auto-select the output style:
+
+| Profile Tier | Output Style | Template Source | settings.json value |
+|---|---|---|---|
+| **Guided** | `Beginner-Friendly` | [OUTPUT_STYLE_BEGINNER.md](references/OUTPUT_STYLE_BEGINNER.md) | `"outputStyle": "Beginner-Friendly"` |
+| **Supported** | `Supported` | [OUTPUT_STYLE_SUPPORTED.md](references/OUTPUT_STYLE_SUPPORTED.md) | `"outputStyle": "Supported"` |
+| **Standard** | `Standard` | [OUTPUT_STYLE_STANDARD.md](references/OUTPUT_STYLE_STANDARD.md) | `"outputStyle": "Standard"` |
+| **Expert** | `Expert` | [OUTPUT_STYLE_EXPERT.md](references/OUTPUT_STYLE_EXPERT.md) | `"outputStyle": "Expert"` |
+
+**After Global Flow:**
+- If mode is `global-only`: read existing purpose from `.claude/user-context.md` (`<!-- onboard:purpose -->` section) for safety derivation, then skip to Safety Derivation → Step 5
+- If mode is `full`: continue to Project Flow
+
+---
+
+## Project Flow
+
+Runs when `has_project` is false, or after Global Flow in `full` mode.
+
+### Step P1 — Purpose (project-scoped)
+
+**AskUserQuestion: "What will you mainly use Claude Code for in this project?"**
+Header: "Purpose"
+
+| Option | Description |
+|---|---|
+| Prototyping | Quick experiments and exploring ideas — speed over polish |
+| Learning | Understanding code, following tutorials, building skills |
+| Production | Real projects that need quality, testing, and reliability |
+
+> **Storage:** Purpose is saved to `.claude/user-context.md` (project-level, gitignored). Different projects can have different purposes.
+
+**After Step P1:**
+- If mode is `project-only`: read existing tier from `~/.claude/CLAUDE.md` (`<!-- onboard:about-me -->` section) and existing style from (`<!-- onboard:communication -->` section) for safety derivation, then proceed to Safety Derivation → Step 5
+- If mode is `full`: proceed to Safety Derivation → Step 5, then Step P2 after write
+
+---
+
+## Safety Derivation
+
+Based on all inputs (tier + purpose + style), **auto-select** the safety posture. Do NOT ask a separate question — derive it from the profile.
 
 **Evaluate top-to-bottom. First match wins.**
 
@@ -135,39 +186,55 @@ Based on the answers from Steps 1–3, **auto-select** the safety posture. Do NO
 
 See [SAFETY_DEFAULTS.md](references/SAFETY_DEFAULTS.md) for what each posture configures.
 
-### Step 4b — Determine Output Style
-
-Based on the profile tier (from [PROFILES.md](references/PROFILES.md)), auto-select the output style:
-
-| Profile Tier | Output Style | Template Source | settings.json value |
-|---|---|---|---|
-| **Guided** | `Beginner-Friendly` | [OUTPUT_STYLE_BEGINNER.md](references/OUTPUT_STYLE_BEGINNER.md) | `"outputStyle": "Beginner-Friendly"` |
-| **Supported** | `Supported` | [OUTPUT_STYLE_SUPPORTED.md](references/OUTPUT_STYLE_SUPPORTED.md) | `"outputStyle": "Supported"` |
-| **Standard** | `Standard` | [OUTPUT_STYLE_STANDARD.md](references/OUTPUT_STYLE_STANDARD.md) | `"outputStyle": "Standard"` |
-| **Expert** | `Expert` | [OUTPUT_STYLE_EXPERT.md](references/OUTPUT_STYLE_EXPERT.md) | `"outputStyle": "Expert"` |
-
-The output style modifies Claude's **system prompt** — more effective than CLAUDE.md alone for changing communication behavior. Both work together: output style controls *how* Claude communicates, CLAUDE.md controls *what* Claude knows about you.
+---
 
 ### Step 5 — Summary and Confirmation
 
 1. Build the `~/.claude/CLAUDE.md` content using [PROFILES.md](references/PROFILES.md) templates
 2. Build sandbox/safety recommendations using [SAFETY_DEFAULTS.md](references/SAFETY_DEFAULTS.md)
-3. Present a **human-readable summary** (not the raw CLAUDE.md content) that reflects back what you understood:
+3. Present a **human-readable summary** (not the raw CLAUDE.md content) adapted to what changed:
 
+**For `full` mode:**
 ```
 Here's how I'll work with you:
 
-  Comfort level: [their Q1 choice]
-  Purpose:       [their Q2 choice]
-  Communication: [their Q3 choice]
+  Comfort level: [their G1 choice]
+  Purpose:       [their P1 choice]
+  Communication: [their G2 choice]
 
 What this means:
 - [1-2 sentence plain-language description of how Claude will behave]
-- [Safety posture in plain language, e.g., "I'll explain every command before running it"]
-- [Output style in plain language, e.g., "Using Beginner-Friendly mode for extra-clear explanations"]
+- [Safety posture in plain language]
+- [Output style in plain language]
 
 Safety recommendations:
 - [List from SAFETY_DEFAULTS.md, adapted to tier language]
+```
+
+**For `global-only` mode:**
+```
+Here's how I'll work with you:
+
+  Comfort level: [their G1 choice]
+  Communication: [their G2 choice]
+  Purpose:       [existing purpose — unchanged]
+
+What this means:
+- [description]
+- [Safety posture — note if it changed due to new tier]
+- [Output style]
+```
+
+**For `project-only` mode:**
+```
+Here's how I'll use Claude Code in this project:
+
+  Purpose:       [their P1 choice]
+  Profile:       [existing tier — unchanged]
+
+What this means:
+- [description of how purpose affects behavior]
+- [Safety posture — note if it changed due to new purpose]
 ```
 
 4. Use **AskUserQuestion** to confirm:
@@ -182,8 +249,8 @@ Header: "Your Profile"
 | Start over | Re-do the whole wizard from scratch |
 
 - **If "Looks good"**: Proceed to Step 6
-- **If "Adjust something"**: Ask which question to redo (Q1, Q2, or Q3), re-ask only that question, re-derive everything, and return to Step 5
-- **If "Start over"**: Jump back to Step 1
+- **If "Adjust something"**: Ask which question to redo (only questions asked in current mode), re-ask only that question, re-derive everything, and return to Step 5
+- **If "Start over"**: Jump back to the start of the current flow (Global Flow for global/full, Project Flow for project-only)
 
 ### Step 6 — Write and Confirm
 
@@ -202,13 +269,21 @@ Header: "Your Profile"
    - If a `user_profile` memory already exists, update it instead of creating a duplicate
    - Update MEMORY.md index with a pointer to the file
 
+**For `full` and `global-only` modes — write global file:**
 1. If `~/.claude/CLAUDE.md` exists:
    - Read existing content
    - **Preserve** any sections NOT generated by onboarding (sections without the `<!-- onboard -->` marker)
    - Replace only the onboard-generated sections
 2. If it doesn't exist, create it
-3. All onboard-generated sections must start with `<!-- onboard:section-name -->` HTML comment so future runs can identify and replace them
-4. **Write project-level context**: Save the user's tier and purpose to `.claude/user-context.md` (project root, gitignored):
+3. All onboard-generated sections must start with `<!-- onboard:section-name -->` HTML comment
+4. **Install output style**: Copy the template from the matching `OUTPUT_STYLE_*.md` reference to `~/.claude/output-styles/` (create directory if needed)
+5. **Set the output style** in `~/.claude/settings.json`:
+   - Read existing settings (if any) and merge — don't overwrite other settings
+   - Set `"outputStyle"` to the value from Step G3
+   - Tell the user: "Output style set to [name]. This takes effect in your next session."
+
+**For `full` and `project-only` modes — write project file:**
+6. **Write project-level context**: Save the user's tier and purpose to `.claude/user-context.md` (project root, gitignored):
    ```markdown
    <!-- onboard:tier -->
    # Tier: {tier}
@@ -221,20 +296,22 @@ Header: "Your Profile"
    - ...
    <!-- /onboard:purpose -->
    ```
-   Where `{tier}` is one of: `guided`, `supported`, `standard`, `expert` (lowercase). This enables CLAUDE.md's Contextual Skill Routing rules to detect the tier from a single file without cross-referencing `~/.claude/CLAUDE.md`.
-   Where `{label}` is the purpose label from PROFILES.md Variable Mappings (e.g., "prototyping and experiments") and the bullets are from Purpose Additions (e.g., "Prioritize speed", "Suggest throwaway branches"). The label enables reverse-lookup for `show` and `level-up`; the bullets are the actionable instructions Claude follows.
-5. **Install output style**: Copy the template from the matching `OUTPUT_STYLE_*.md` reference to `~/.claude/output-styles/` (create directory if needed)
-6. **Set the output style** in `~/.claude/settings.json`:
-   - Read existing settings (if any) and merge — don't overwrite other settings
-   - Set `"outputStyle"` to the value from Step 4b
-   - Tell the user: "Output style set to [name]. This takes effect in your next session."
-7. Display a summary of what was written and configured
-8. If safety posture recommends sandbox, show the user how to enable it:
+   Where `{tier}` is one of: `guided`, `supported`, `standard`, `expert` (lowercase).
+   Where `{label}` is the purpose label from PROFILES.md Variable Mappings and the bullets are from Purpose Additions.
+
+**For `project-only` mode — also update safety in global file:**
+7. If the new purpose changes the derived safety posture vs. what's currently in `~/.claude/CLAUDE.md`:
+   - Read `~/.claude/CLAUDE.md`, replace only the `<!-- onboard:safety -->` section with the newly derived posture
+   - This is the only global section touched in project-only mode
+
+**All modes — wrap up:**
+8. Display a summary of what was written and configured
+9. If safety posture recommends sandbox, show the user how to enable it:
    - "To enable sandbox mode, run `/sandbox` in Claude Code"
    - Show recommended `settings.json` additions if applicable
-9. Proceed to Step 7 (Dev Environment)
+10. **Proceed to Step P2 (Caddy)** only for `full` and `project-only` modes. Skip for `global-only`.
 
-### Step 7 — Dev Environment (Caddy Reverse Proxy)
+### Step P2 — Dev Environment (Caddy Reverse Proxy)
 
 Set up the shared Caddy reverse proxy so every Docker-based app gets a clean HTTPS domain (`https://myapp.localhost`) with no port conflicts. This is a one-time setup that benefits all future projects.
 
@@ -413,14 +490,15 @@ This allows future `/onboard` runs to update only these sections while preservin
 
 AskUserQuestion always provides an "Other" option for custom text. When a user types a freeform answer:
 
-1. **For Q1 (Coding Comfort):** Map to the closest predefined option based on the level of support they're describing. If unclear, ask: "To tailor your setup, which of these is closest?" and re-present the options.
-2. **For Q2/Q3:** Map to the closest predefined option based on semantic meaning.
+1. **For G1 (Coding Comfort):** Map to the closest predefined option based on the level of support they're describing. If unclear, ask: "To tailor your setup, which of these is closest?" and re-present the options.
+2. **For G2/P1:** Map to the closest predefined option based on semantic meaning.
 
 ## Rules
 
 - **Never overwrite user-added sections** in `~/.claude/CLAUDE.md` — only replace onboard-marked sections
 - **Always preview before writing** — show the exact content and get confirmation
 - **Derive safety posture automatically** — don't make non-technical users choose security settings they can't evaluate
-- **One question per AskUserQuestion call** (3 questions total) — keep it clear, no tabs
+- **One question per AskUserQuestion call** — keep it clear, no tabs
 - **Use plain language in all options** — no jargon in option labels or descriptions
 - **Include the "Other" escape hatch** — AskUserQuestion always provides this automatically
+- **In `project-only` mode, write to global file only for safety updates** — purpose can change the derived safety posture, so `~/.claude/CLAUDE.md`'s safety section must stay in sync

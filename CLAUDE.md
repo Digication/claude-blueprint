@@ -1,8 +1,11 @@
 # Environment
 - Package manager: pnpm
 - Language: TypeScript
-- Run `/onboard` if `~/.claude/CLAUDE.md` has no `## About Me` section
-
+- Run `/onboard` if `~/.claude/CLAUDE.md` has no `## About Me` section OR `.claude/user-context.md` is missing
+- **Dev setup**: Docker + Caddy reverse proxy. Start with `docker compose up -d --build`. The app is served at `https://<name>.localhost` via Caddy labels. Do NOT use `pnpm dev` directly on the host. Do NOT add `ports:` mappings to docker-compose.yml as a workaround — if the app isn't accessible, ensure Caddy is running (`cd ~/caddy && docker compose up -d`).
+- **Unit tests**: `docker compose exec <app-name> pnpm test`
+- **E2e tests**: `docker compose run --rm e2e`
+- 
 # Workflow
 - Commit messages: Conventional Commits format (`feat(scope): description`)
 - Skill quality pipeline (for skill authors): `/skill-dev review` → `/skill-dev test` → `/skill-dev integration plan` → fix → ship
@@ -27,8 +30,9 @@ When saving learnings, route to the right destination. First match wins:
 # User Context
 - Load `.claude/user-context.md` if it exists — contains per-user project preferences (gitignored, created by `/onboard`)
 - Detect the user's tier from `.claude/user-context.md` (`<!-- onboard:tier -->` section): `guided`, `supported`, `standard`, or `expert`
-  - Fallback if no tier marker: infer from `~/.claude/CLAUDE.md` About Me section — "new to coding" → Guided, "building my skills" → Supported, "comfortable with code" → Standard, empty → Expert
-  - If no profile exists at all: treat as **Guided** (safest default) and auto-trigger `/onboard`
+  - Fallback if no tier marker in project file: infer from `~/.claude/CLAUDE.md` About Me section — "new to coding" → Guided, "building my skills" → Supported, "comfortable with code" → Standard, empty → Expert
+  - If neither file exists: treat as **Guided** (safest default) and auto-trigger `/onboard` (runs full setup)
+  - If global profile exists but `.claude/user-context.md` is missing: auto-trigger `/onboard` (runs project-only setup — asks only for purpose and Caddy)
 - Use the detected tier to control **how** you invoke skills (see Contextual Skill Routing below)
 
 # Contextual Skill Routing
