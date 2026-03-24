@@ -157,7 +157,7 @@ Generate implementation plan documents following the structure in [PLAN_STRUCTUR
 
 ### Workflow
 
-1. **Understand the scope.** Read relevant existing code, CLAUDE.md, and any linked docs/issues. Ask clarifying questions if the scope is ambiguous.
+1. **Understand the scope.** Read relevant existing code, project `CLAUDE.md`, and any linked docs/issues. Ask clarifying questions if the scope is ambiguous.
 
 2. **Choose the tech stack.** For new apps, propose a stack based on the preferences above and the app's requirements. For existing apps, use the established stack. Get user approval on stack choices before writing phase docs.
 

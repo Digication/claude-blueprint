@@ -19,7 +19,7 @@ Ask these questions in order. First match wins:
 | Question | If Yes | Destination |
 |---|---|---|
 | Is it about how a specific skill behaved? | [SKILL_IMPROVEMENT](SKILL_IMPROVEMENT.md) | Skill file |
-| Is it a team standard everyone should follow? | [GENERAL_IMPROVEMENT](GENERAL_IMPROVEMENT.md) | CLAUDE.md |
+| Is it a team standard everyone should follow? | [GENERAL_IMPROVEMENT](GENERAL_IMPROVEMENT.md) | Project `CLAUDE.md` |
 | Is it personal to this user? | **This protocol** | Auto memory |
 | Is it temporary project context? | **This protocol** | Auto memory |
 | Is it a pointer to an external system? | **This protocol** | Auto memory |
@@ -141,6 +141,6 @@ so I'll save it to memory rather than editing project files. OK?
 ## Quality Filter
 
 **Capture:** Personal preferences, project deadlines, team context, external system pointers, confirmed workflow approaches
-**Skip:** One-off requests, information derivable from code/git, anything already in CLAUDE.md or skill files, sensitive information (credentials, tokens)
+**Skip:** One-off requests, information derivable from code/git, anything already in project `CLAUDE.md` or skill files, sensitive information (credentials, tokens)
 
 **Test**: "Will this help me work better with this user in a future conversation?"

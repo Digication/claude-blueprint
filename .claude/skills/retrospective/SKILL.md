@@ -56,7 +56,7 @@ User: No, we use pnpm in this project, not npm
 User: /retrospective
 Agent: I noticed a general preference:
        **Package manager**: This project uses pnpm, not npm.
-       I'll save this to CLAUDE.md.
+       I'll save this to the project CLAUDE.md.
 ```
 
 ### After a Personal Preference or Project Context (Memory Capture)
@@ -74,7 +74,7 @@ User: We're freezing all merges after Thursday for the mobile release
 User: /retrospective
 Agent: I noticed temporary project context worth remembering:
        **Merge freeze**: Begins 2026-03-26 for mobile release.
-       This is temporary, so I'll save it to memory rather than CLAUDE.md. OK?
+       This is temporary, so I'll save it to memory rather than project files. OK?
 ```
 
 ### After a Successful New Workflow (Skill Creation)

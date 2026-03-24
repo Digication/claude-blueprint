@@ -1,6 +1,6 @@
 # General Improvement Protocol
 
-> Capture cross-cutting preferences in CLAUDE.md.
+> Capture cross-cutting preferences in the project root `CLAUDE.md`.
 
 ## When This Applies
 
@@ -33,17 +33,17 @@ I noticed a general preference:
 
 **[Preference Title]**: [Description of preference and correct usage].
 
-I'll add this to CLAUDE.md. Proceed?
+I'll add this to the project CLAUDE.md. Proceed?
 ```
 
 ## Save Process
 
-1. Check if `CLAUDE.md` exists at project root
+1. Check if `CLAUDE.md` exists at the project root
 2. If not, create it with a `# Claude Instructions` header
 3. Propose the addition with section, content, and reason
 4. Ask for approval before applying
 
-### Example CLAUDE.md Structure
+### Example Project CLAUDE.md Structure
 
 ```markdown
 # Claude Instructions

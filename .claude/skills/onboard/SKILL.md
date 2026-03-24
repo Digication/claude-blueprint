@@ -92,7 +92,7 @@ After the user picks:
 1. Re-derive safety posture using the new tier + existing purpose (from `.claude/user-context.md`) + existing style (from current `~/.claude/CLAUDE.md`)
 2. Re-derive output style from the new tier
 3. Delete the old output style file from `~/.claude/output-styles/` (identify from current `settings.json` `outputStyle` value → map to filename)
-4. Regenerate all onboard sections using new tier but **preserve existing purpose/style values** (purpose from project file, style from global CLAUDE.md)
+4. Regenerate all onboard sections using new tier but **preserve existing purpose/style values** (purpose from project file, style from `~/.claude/CLAUDE.md`)
 5. Jump to Step 5 (Preview and confirm), mode = global-only
 
 ---

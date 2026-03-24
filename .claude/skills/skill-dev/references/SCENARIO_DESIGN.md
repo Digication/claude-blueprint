@@ -34,7 +34,7 @@ cd "$TEMP_DIR"
 ```
 
 ### Combined (most realistic)
-Use when skill writes global config AND runs git ops — e.g., `onboard` writes CLAUDE.md AND `task` creates branches.
+Use when skill writes global config AND runs git ops — e.g., `onboard` writes `~/.claude/CLAUDE.md` AND `task` creates branches.
 
 ### No isolation
 Acceptable for read-only operations (`status`, `show`, `list`) that only observe state.
