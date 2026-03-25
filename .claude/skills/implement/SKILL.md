@@ -30,7 +30,7 @@ Header: "Uncommitted Work"
 
 | Option | Description |
 |---|---|
-| Stash them | Save changes to git stash — you can resume later with `/task resume` |
+| Stash them | Save changes to git stash — you can get them back later |
 | Commit as WIP | Create a work-in-progress commit on the current branch |
 | They're related | Keep them — these changes are part of this work |
 | Discard them | Throw away uncommitted changes (cannot be undone) |
@@ -63,7 +63,7 @@ Before starting, assess the scope to choose the right approach:
 |---|---|
 | "plan ...", "design ...", "create a plan for ..." | **Plan mode** — generate plan docs only |
 | "execute ...", "run the plan" | **Execute mode** — run phases via sub-agents |
-| "implement ...", "build ...", "add ..." (simple) | **Direct mode** — implement immediately |
+| "implement ...", "build ...", "add ...", "fix ...", "update ...", "change ..." (simple) | **Direct mode** — implement immediately |
 | "implement ...", "build ..." (complex, no plan exists) | **Plan mode first**, then offer to execute |
 | "resume from phase N" | **Execute mode** — start from phase N |
 
@@ -73,10 +73,11 @@ Before starting, assess the scope to choose the right approach:
 
 For small-to-medium changes that don't warrant a full plan. Implement directly using standard tools.
 
-1. Read relevant existing code to understand the codebase
-2. Implement the changes
-3. Run verification (typecheck, tests)
-4. Report what was done
+1. **Branch check**: If the user's purpose (from `.claude/user-context.md`) is Production, suggest creating a feature branch before making changes. Skip for Prototyping or Learning.
+2. Read relevant existing code to understand the codebase
+3. Implement the changes
+4. Run verification (typecheck, tests)
+5. Report what was done
 
 ---
 
@@ -161,6 +162,10 @@ Generate implementation plan documents following the structure in [PLAN_STRUCTUR
    /implement execute docs/implementation-plan/<feature-name>
    ```
    ```
+
+   Adapt the execution prompt to the user's tier:
+   - **Guided/Supported**: "When you're ready to build, start a new chat and tell me to run the plan at `docs/implementation-plan/<feature-name>`."
+   - **Standard/Expert**: Show the slash command as above.
 
    Do NOT say "Want me to start building?" or ask for approval before showing the prompt. The user can review the docs and start execution when ready — no extra round-trip needed.
 
