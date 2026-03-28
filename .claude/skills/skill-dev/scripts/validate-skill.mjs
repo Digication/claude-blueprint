@@ -171,9 +171,16 @@ function validateDescription(description, result) {
     }
   }
 
-  const triggerPhrases = ['use when', 'use for', 'use this', 'when the user', 'if the user', 'when asked'];
+  const triggerPhrases = ['use when', 'use for', 'use this', 'when the user', 'if the user', 'when asked', 'trigger on'];
   if (!triggerPhrases.some(phrase => descLower.includes(phrase))) {
     result.addWarning("description should include 'when to use' indicators for discovery");
+  }
+
+  // Check if description reads like a summary vs trigger phrases
+  const sentences = description.split(/[.!]/).filter(s => s.trim().length > 0);
+  const avgSentenceLen = sentences.reduce((sum, s) => sum + s.trim().split(/\s+/).length, 0) / sentences.length;
+  if (sentences.length <= 2 && avgSentenceLen > 15) {
+    result.addWarning('description may be a summary rather than trigger phrases - consider listing specific phrases users might say');
   }
 }
 
@@ -183,6 +190,46 @@ function validateBody(body, result) {
 
   if (lineCount > 500) {
     result.addWarning(`SKILL.md has ${lineCount} lines - consider keeping under 500`);
+  }
+
+  // Check for Gotchas section
+  if (/^##\s+Gotchas/m.test(body)) {
+    result.addInfo('Gotchas section found');
+  } else {
+    result.addWarning('No ## Gotchas section found - consider adding real failure patterns Claude has hit');
+  }
+}
+
+function validateAllowedTools(frontmatter, result) {
+  // Check in both top-level and nested metadata
+  const tools = frontmatter['allowed-tools']
+    || (frontmatter.metadata && frontmatter.metadata['allowed-tools'])
+    || '';
+
+  if (!tools) return;
+
+  // Flag bare "Bash" without command restriction
+  const toolList = tools.split(',').map(t => t.trim());
+  for (const tool of toolList) {
+    if (tool === 'Bash') {
+      result.addWarning('allowed-tools includes bare "Bash" (too permissive) - use Bash(command:*) for specific commands');
+    }
+  }
+}
+
+function validateReferencedFiles(body, skillDir, result) {
+  // Find markdown links like [text](path) and check if files exist
+  const linkPattern = /\[([^\]]*)\]\(([^)]+)\)/g;
+  let match;
+  while ((match = linkPattern.exec(body)) !== null) {
+    const linkPath = match[2];
+    // Skip URLs and anchors
+    if (linkPath.startsWith('http') || linkPath.startsWith('#') || linkPath.startsWith('$')) continue;
+
+    const resolved = path.resolve(skillDir, linkPath);
+    if (!fs.existsSync(resolved)) {
+      result.addError(`Referenced file not found: ${linkPath}`);
+    }
   }
 }
 
@@ -238,7 +285,9 @@ function validateSkill(skillPath) {
   const dirName = path.basename(skillDir);
   validateName(frontmatter.name || '', dirName, result);
   validateDescription(frontmatter.description || '', result);
+  validateAllowedTools(frontmatter, result);
   validateBody(body, result);
+  validateReferencedFiles(body, skillDir, result);
   validateStructure(skillDir, result);
 
   return result;

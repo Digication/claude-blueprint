@@ -13,6 +13,18 @@
 
 A single skill often needs BOTH types — dry-run for the logic, integration for the git/file ops.
 
+### Classification Decision Tree
+
+For each workflow or command in the skill:
+
+1. Does it run git write operations (commit, stash, branch, checkout, push)? → **Integration** (use temp clone)
+2. Does it write to `~/.claude/` or other global paths? → **Integration** (use fake HOME)
+3. Does it write to the project directory? → **Integration** (use temp clone)
+4. Does it only read files/git state and make decisions? → **Dry-run**
+5. Does it use `AskUserQuestion` or other interactive tools? → Can be **either** (user choice becomes a simulated input in dry-run, or a real prompt in integration)
+
+If a single command mixes read-only logic with write operations, split the test: dry-run for decision tracing, integration for verifying the actual writes.
+
 ## Isolation Strategy
 
 ### Fake HOME (for global writes)

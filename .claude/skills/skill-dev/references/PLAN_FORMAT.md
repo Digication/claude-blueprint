@@ -102,6 +102,19 @@ rm -rf "$FAKE_HOME"  # if used
 
 ---
 
+## Execution Order
+
+{Specify which scenarios can run in parallel and which must run sequentially.}
+
+- **Parallel group A**: Scenarios {list} — independent, no shared state
+- **Parallel group B**: Scenarios {list} — independent, no shared state
+- **Sequential group C**: Scenarios {list} — must run in this order (each depends on prior state)
+- **Cleanup**: After each sequential group, run per-scenario cleanup before the next group
+
+{Adjust groups as needed. Any scenario that reads state left by a prior scenario MUST be in a sequential group.}
+
+---
+
 ## Cross-Scenario Checks
 
 ### Decision Table Coverage

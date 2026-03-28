@@ -1,8 +1,16 @@
 ---
 name: skill-dev
-description: Review, test, and validate Claude skills. Use when asked to review a skill, test a skill, audit skill quality, validate SKILL.md files, run integration tests on skills, or improve existing skills. Combines static review, behavioral dry-run testing, and real-world integration testing.
+description: Review, test, and validate Claude skills. Trigger on review skill, test skill, audit skill, validate SKILL.md, check skill quality, is this skill good, improve this skill, skill pipeline, skill QA. Combines static review, behavioral dry-run testing, and real-world integration testing.
 metadata:
   allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Agent
+hooks:
+  PreToolUse:
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          command: "./scripts/guard-integration.sh"
+          timeout: 10
+          statusMessage: "Checking command safety for integration tests..."
 ---
 
 # Skill Development — Review, Test, Validate
@@ -13,14 +21,39 @@ Unified skill for the skill quality pipeline. Three modes, run in order:
 /skill-dev review <skill> → /skill-dev test <skill> → /skill-dev integration <skill>
 ```
 
+## Available skills
+!`ls .claude/skills/`
+
 ## Arguments
 
 - `review <skill-name>`: Static quality review against checklist
 - `test <skill-name> [scenario]`: Behavioral dry-run with fresh-context agents
 - `integration plan <skill-name>`: Create real-world integration test plan
 - `integration evaluate`: Read test results and propose fixes
-- `<skill-name>`: Auto-detect — review first, then offer to test
-- (no args): List available skills and ask which to work on
+- `<skill-name>`: Auto-detect — review first, then offer to test (see Auto-Detect Flow below)
+- (no args): List available skills and ask which to work on (see No-Args Flow below)
+
+### Skill Name Validation
+
+Before any mode runs, validate the skill name: check that `.claude/skills/<skill-name>/SKILL.md` exists. If not, list available skills and ask the user to pick one.
+
+### Auto-Detect Flow
+
+When the argument is a bare skill name (no mode keyword):
+
+1. Run Mode 1 (Review) in full
+2. After the review report, ask: "Review complete. Want me to test this skill with dry-run scenarios? (yes/no)"
+3. If **yes** → proceed to Mode 2 (Test) for the same skill
+4. If **no** → done, save review to log and exit
+
+### No-Args Flow
+
+When no arguments are provided:
+
+1. Show the available skills list (populated by the `!`\`ls .claude/skills/\`` injection)
+2. Ask: "Which skill would you like to work on?"
+3. After the user names a skill, ask: "What would you like to do? (review / test / integration plan)"
+4. If the user just names a skill without picking a mode, follow the Auto-Detect Flow above
 
 ---
 
@@ -30,38 +63,20 @@ Static quality review of a skill's structure, metadata, and content.
 
 ### Workflow
 
-1. **Run automated validation**:
-   ```bash
-   node <skill-base-dir>/scripts/validate-skill.mjs /path/to/skill/
-   ```
-   Replace `<skill-base-dir>` with this skill's base directory.
+Run the automated validator first (`node <skill-base-dir>/scripts/validate-skill.mjs /path/to/skill/`), then review against [CHECKLIST.md](references/CHECKLIST.md) — covering metadata, structure, content quality, and effectiveness. See [ALLOWED_TOOLS.md](references/ALLOWED_TOOLS.md) for tool safety guidelines.
 
-2. **Metadata review** — validate YAML frontmatter:
-   - **name**: Lowercase, hyphens, numbers only; must match directory name
-   - **description**: Third person, includes "when to use" triggers
-   - **allowed-tools**: See [ALLOWED_TOOLS.md](references/ALLOWED_TOOLS.md) for safety guidelines
+Generate a feedback report:
 
-3. **Structure assessment**:
-   - SKILL.md under 500 lines, uses progressive disclosure
-   - References one level deep, focused on single topics
+```markdown
+# Skill Review: [skill-name]
+## Summary — [1-2 sentence assessment]
+## Critical Issues (must fix)
+## Recommendations (should fix)
+## Suggestions (nice to have)
+## Strengths
+```
 
-4. **Content quality** — see [CHECKLIST.md](references/CHECKLIST.md):
-   - Every paragraph justifies its token cost
-   - Single terminology throughout
-   - Clear defaults, no vague options
-   - Step-by-step workflows for complex tasks
-
-5. **Generate feedback report**:
-   ```markdown
-   # Skill Review: [skill-name]
-   ## Summary — [1-2 sentence assessment]
-   ## Critical Issues (must fix)
-   ## Recommendations (should fix)
-   ## Suggestions (nice to have)
-   ## Strengths
-   ```
-
-6. **Self-critique** — follow [SELF_CRITIQUE.md](references/SELF_CRITIQUE.md): check if your checklist caught everything or if you relied on intuition.
+Finish with self-critique per [SELF_CRITIQUE.md](references/SELF_CRITIQUE.md) — check if the checklist caught everything or if you relied on intuition.
 
 ---
 
@@ -129,7 +144,9 @@ Two-phase workflow for skills that touch the real file system, git, or global co
 
 4. **Write the test plan** to `.claude/tests/TEST_PLAN.md` — must be fully self-contained (a fresh session can execute it). See [PLAN_FORMAT.md](references/PLAN_FORMAT.md).
 
-5. Tell the user: "Open a fresh Claude Code session and say: 'Execute the test plan at `.claude/tests/TEST_PLAN.md` and save results to `.claude/tests/TEST_RESULTS.md`.'"
+5. **Self-critique** — follow [SELF_CRITIQUE.md](references/SELF_CRITIQUE.md): check scenario coverage (every decision table row hit?), dry-run vs. integration classifications justified, and execution ordering complete.
+
+6. Tell the user: "Open a fresh Claude Code session and say: 'Execute the test plan at `.claude/tests/TEST_PLAN.md` and save results to `.claude/tests/TEST_RESULTS.md`.'"
 
 ### `integration evaluate`
 
@@ -138,6 +155,37 @@ Two-phase workflow for skills that touch the real file system, git, or global co
 3. For each Bug: identify exact line(s), propose specific edit, explain why
 4. Ask for approval, then apply fixes
 5. Suggest re-running the plan in a fresh session to verify
+
+---
+
+## Gotchas
+
+- The validate script only checks metadata format — it does NOT check content quality. A passing validation is not a full review.
+- Test agents sometimes "help" by inferring missing rules instead of flagging them as Gaps. The test prompt must explicitly say: flag ambiguity, don't fill in gaps yourself.
+- Bare `Bash` (without command restriction) in allowed-tools is the #1 review finding — always flag it.
+- Self-critique often produces generic "looks good" output. Push for specific checklist item references — "checklist item X was not covered" is useful, "review was thorough" is not.
+- When testing decision-heavy skills, agents tend to skip "Other/freeform" inputs. Explicitly include them in scenarios.
+- Skills that write to `~/.claude/` need a fake HOME in dry-run tests — agents forget this and report false passes.
+- Dynamic content injection (`!`\`...\``) commands must be single operations — pipes and chained commands fail the shell permission check. Use one simple command.
+
+---
+
+## Review History
+
+After each review or test, append a summary to `${CLAUDE_PLUGIN_DATA}/skill-dev/reviews.log`:
+
+```
+{date} | {mode} | {skill-name} | {verdict} | {issue-count} | {one-line summary}
+```
+
+On each run:
+- Check the log: if skill was reviewed in the **last 7 days** and hasn't changed, mention this and offer options
+- Detect changes with: `git diff HEAD@{7.days.ago} -- .claude/skills/<skill-name>/` (checks the entire skill directory, not just SKILL.md)
+- If recent review exists AND no changes detected, ask: "This skill was reviewed on {date} with verdict {verdict}. No changes since. Want to: (1) Re-review anyway, (2) Skip to testing, (3) Cancel?"
+  - **Re-review** → proceed with Mode 1 normally
+  - **Skip to testing** → jump directly to Mode 2 (Test) for this skill
+  - **Cancel** → exit, no action taken
+- Surface patterns across skills: "This is the 3rd skill with bare Bash in allowed-tools"
 
 ---
 

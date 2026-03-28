@@ -8,3 +8,4 @@ build/
 .DS_Store
 .claude/user-context.md
 .claude/tests/TEST_RESULTS.md
+.claude/skills/*/.plugin-data/
