@@ -148,7 +148,7 @@ Multi-layer testing system. Each layer catches different kinds of issues. See [E
    ## Verdict: [PASS / FAIL / PARTIAL]
    ```
 
-5. **Log results** — append to `${CLAUDE_PLUGIN_DATA}/skill-dev/reviews.log`
+5. **Log results** — append to `${CLAUDE_PLUGIN_DATA}/reviews.log`
 
 ### Exploratory Workflow (`/skill-dev test <skill> --explore`)
 
@@ -245,7 +245,7 @@ Two-phase workflow for skills that touch the real file system, git, or global co
 
 ## Review History
 
-After each review or test, append a summary to `${CLAUDE_PLUGIN_DATA}/skill-dev/reviews.log`:
+After each review or test, append a summary to `${CLAUDE_PLUGIN_DATA}/reviews.log`:
 
 ```
 {date} | {mode} | {skill-name} | {verdict} | {issue-count} | {one-line summary}
