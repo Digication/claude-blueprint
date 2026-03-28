@@ -27,7 +27,8 @@ Unified skill for the skill quality pipeline. Three modes, run in order:
 ## Arguments
 
 - `review <skill-name>`: Static quality review against checklist
-- `test <skill-name> [scenario]`: Behavioral dry-run with fresh-context agents
+- `test <skill-name>`: Behavioral dry-run with fresh-context agents
+- `test <skill-name> <scenario>`: Run a single named scenario only (skip scenario design, run one agent, produce abbreviated report with no cross-scenario analysis)
 - `integration plan <skill-name>`: Create real-world integration test plan
 - `integration evaluate`: Read test results and propose fixes
 - `<skill-name>`: Auto-detect — review first, then offer to test (see Auto-Detect Flow below)
@@ -35,7 +36,16 @@ Unified skill for the skill quality pipeline. Three modes, run in order:
 
 ### Skill Name Validation
 
-Before any mode runs, validate the skill name: check that `.claude/skills/<skill-name>/SKILL.md` exists. If not, list available skills and ask the user to pick one.
+Before any mode runs, validate the skill name: check that `.claude/skills/<skill-name>/SKILL.md` exists. If not, show:
+
+```
+Skill '{name}' not found. Available skills:
+{bulleted list from ls .claude/skills/}
+
+Which skill would you like to work on?
+```
+
+After the user picks a valid skill, continue with the originally requested mode (e.g., if user ran `review badname`, ask for a skill then proceed to review).
 
 ### Auto-Detect Flow
 
@@ -63,7 +73,9 @@ Static quality review of a skill's structure, metadata, and content.
 
 ### Workflow
 
-Run the automated validator first (`node <skill-base-dir>/scripts/validate-skill.mjs /path/to/skill/`), then review against [CHECKLIST.md](references/CHECKLIST.md) — covering metadata, structure, content quality, and effectiveness. See [ALLOWED_TOOLS.md](references/ALLOWED_TOOLS.md) for tool safety guidelines.
+1. **Check Review History first** — see the Review History section below. If a recent review exists with no changes, offer to skip/re-review/cancel before proceeding.
+
+2. **Run the automated validator** (`node <skill-base-dir>/scripts/validate-skill.mjs /path/to/skill/`), then review against [CHECKLIST.md](references/CHECKLIST.md) — covering metadata, structure, content quality, and effectiveness. See [ALLOWED_TOOLS.md](references/ALLOWED_TOOLS.md) for tool safety guidelines.
 
 Generate a feedback report:
 
@@ -99,7 +111,15 @@ Spawn fresh-context agents to simulate skill execution with defined test scenari
    | Freeform input | "Other" or custom text responses |
    | Idempotency | Running the skill twice with same inputs |
 
-   Scenario count: simple skills 2–3, decision-heavy 4–6, complex 6–8. Present and get approval before running.
+   Scenario count: simple skills 2–3, decision-heavy 4–6, complex 6–8. Present scenarios for approval before running, using this format:
+
+   ```
+   | # | Name | Category | What it tests |
+   |---|---|---|---|
+   | 1 | {name} | {category} | {one-line description} |
+   ```
+
+   Ask: "Ready to run these {N} scenarios? (yes/no)"
 
 3. **Run test agents** — for each scenario, spawn an Agent with:
    - **Fresh context** — no conversation history
@@ -167,6 +187,7 @@ Two-phase workflow for skills that touch the real file system, git, or global co
 - When testing decision-heavy skills, agents tend to skip "Other/freeform" inputs. Explicitly include them in scenarios.
 - Skills that write to `~/.claude/` need a fake HOME in dry-run tests — agents forget this and report false passes.
 - Dynamic content injection (`!`\`...\``) commands must be single operations — pipes and chained commands fail the shell permission check. Use one simple command.
+- `${CLAUDE_PLUGIN_DATA}` resolves to `.plugin-data/` inside the skill's own directory (e.g., `.claude/skills/skill-dev/.plugin-data/`). Don't hardcode paths — use the variable. Test agents often fail to resolve this and report the log as missing.
 
 ---
 
@@ -179,11 +200,11 @@ After each review or test, append a summary to `${CLAUDE_PLUGIN_DATA}/skill-dev/
 ```
 
 On each run:
-- Check the log: if skill was reviewed in the **last 7 days** and hasn't changed, mention this and offer options
+- Check the log: if skill was reviewed in the **last 7 calendar days** (< 7 days ago, using the date in the log entry) and hasn't changed, mention this and offer options. If multiple entries exist for the same skill, use the most recent one.
 - Detect changes with: `git diff HEAD@{7.days.ago} -- .claude/skills/<skill-name>/` (checks the entire skill directory, not just SKILL.md)
 - If recent review exists AND no changes detected, ask: "This skill was reviewed on {date} with verdict {verdict}. No changes since. Want to: (1) Re-review anyway, (2) Skip to testing, (3) Cancel?"
   - **Re-review** → proceed with Mode 1 normally
-  - **Skip to testing** → jump directly to Mode 2 (Test) for this skill
+  - **Skip to testing** → jump directly to Mode 2 (Test) step 1 (Identify the skill). The previous passing review satisfies the "review before testing" rule — no re-validation needed. Design fresh scenarios (do not reuse previous test scenarios).
   - **Cancel** → exit, no action taken
 - Surface patterns across skills: "This is the 3rd skill with bare Bash in allowed-tools"
 
