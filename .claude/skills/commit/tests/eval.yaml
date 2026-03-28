@@ -1,6 +1,6 @@
 skill: commit
 description: Golden dataset for commit skill — regression tests from exploratory testing
-skill_hash: "59821e7112d68841adce754bf6c95d97"
+skill_hash: "3c5f839cc5e987a37df1d1701bfab849"
 
 cases:
   - name: "clean-tree-stops-early"
@@ -31,11 +31,11 @@ cases:
         git_log: "feat(ui): add dashboard\nfix(api): handle null response"
     assert:
       - type: regex
-        value: "^(feat|fix|refactor|docs|test|chore|perf|build|ci|style|revert)"
+        value: "(feat|fix|refactor|docs|test|chore|perf|build|ci|style|revert)\\("
       - type: contains
         value: ":"
-      - type: not-contains
-        value: "."
+      - type: llm-rubric
+        value: "The proposed commit message does not end with a period, uses imperative mood, and is 72 characters or fewer"
     source: "Exploratory test 2026-03-28, scenario happy-path-single-feature"
 
   - name: "user-approval-before-commit"
@@ -53,10 +53,12 @@ cases:
           - "confirm"
           - "look good"
           - "proceed"
+          - "go ahead"
+          - "shall I"
     source: "SKILL.md step 9 requires approval gate"
 
   - name: "scope-inference-from-files"
-    description: "Commit scope should be inferred from changed file paths"
+    description: "Commit scope should be inferred from changed file paths using deepest common directory"
     category: happy-path
     inputs:
       command: "/commit"
@@ -65,4 +67,98 @@ cases:
     assert:
       - type: regex
         value: "\\(auth\\)"
-    source: "SKILL.md step 1 — infer scope from changed files"
+    source: "SKILL.md scope inference rule — deepest common directory"
+
+  - name: "root-level-file-omits-scope"
+    description: "Root-level files like README.md should produce a commit with no scope"
+    category: boundary
+    inputs:
+      command: "/commit"
+      state:
+        git_status: "modified: README.md"
+        git_diff: "Updated installation instructions"
+        git_log: "docs: update contributing guide\nfeat(api): add search"
+    assert:
+      - type: regex
+        value: "^docs:"
+      - type: not-contains
+        value: "docs("
+    source: "Layer 4 finding 2026-03-29, scenario single-doc-change — root files have no scope"
+
+  - name: "all-staged-skips-staging-question"
+    description: "When everything is already staged with nothing unstaged, skip the staging question"
+    category: boundary
+    inputs:
+      command: "/commit"
+      state:
+        git_status: "Changes to be committed:\n  modified: src/utils/helpers.js\n  new file: src/utils/format.js"
+        git_diff_staged: "Added formatDate and formatCurrency helper functions"
+        git_diff_unstaged: ""
+    assert:
+      - type: not-contains
+        value: "stage more"
+      - type: contains-any
+        values:
+          - "feat(utils)"
+          - "feat:"
+    source: "Layer 4 finding 2026-03-29, scenario already-all-staged — unnecessary staging question"
+
+  - name: "mixed-staged-unstaged-lists-both"
+    description: "When both staged and unstaged changes exist, list both groups for the user"
+    category: boundary
+    inputs:
+      command: "/commit"
+      state:
+        git_status: "Changes to be committed:\n  modified: src/api/routes.js\n\nChanges not staged for commit:\n  modified: src/api/middleware.js"
+        git_diff_staged: "Added rate limiting"
+        git_diff_unstaged: "Updated logging"
+    assert:
+      - type: contains-all
+        values:
+          - "routes.js"
+          - "middleware.js"
+      - type: contains-any
+        values:
+          - "only staged"
+          - "include"
+          - "also"
+          - "unstaged"
+    source: "Layer 4 finding 2026-03-29, scenario staged-and-unstaged-mixed"
+
+  - name: "multi-area-omits-scope"
+    description: "Files spanning unrelated directories should omit scope"
+    category: boundary
+    inputs:
+      command: "/commit"
+      state:
+        git_status: "modified: src/auth/login.js\nmodified: src/api/routes.js\nmodified: docs/README.md"
+        git_diff: "Auth: added MFA\nAPI: updated routes\nDocs: updated reference"
+        git_log: "feat(auth): add password reset"
+    assert:
+      - type: not-contains
+        value: "(auth)"
+      - type: regex
+        value: "^feat:"
+      - type: llm-rubric
+        value: "The skill correctly omits scope when files span multiple unrelated directories (auth, api, docs) with no common parent"
+    source: "Layer 4 finding 2026-03-29, scenario multi-area-scope-conflict"
+
+  - name: "branch-creation-with-naming"
+    description: "User requesting a new branch gets a properly formatted branch name suggestion"
+    category: happy-path
+    inputs:
+      command: "/commit"
+      user_message: "commit this on a new branch"
+      state:
+        git_status: "modified: src/auth/mfa.js"
+        git_diff: "Added multi-factor authentication flow"
+        git_log: "feat(auth): add password reset"
+    assert:
+      - type: regex
+        value: "feat/[a-z0-9-]+"
+      - type: contains-any
+        values:
+          - "mfa"
+          - "multi-factor"
+          - "auth"
+    source: "Layer 4 finding 2026-03-29, scenario branch-creation-request"
