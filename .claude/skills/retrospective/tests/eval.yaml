@@ -3,6 +3,8 @@ description: Golden dataset for retrospective skill — learning routing
 skill_hash: "02423d59b1ef54fb23c0890f2f4c616d"
 
 cases:
+  # --- Existing cases (assertions fixed) ---
+
   - name: "skill-correction-routes-to-skill-file"
     description: "When a skill behaved wrong, the fix should target the skill file"
     category: happy-path
@@ -16,8 +18,10 @@ cases:
           - "skill file"
           - "SKILL.md"
           - "commit"
-      - type: not-contains
-        value: "memory"
+      - type: decision-trace
+        input: "conversation has a skill-specific correction to the commit skill"
+        rule: "Check For #1: Skill corrections → SKILL_IMPROVEMENT"
+        result: "Route to SKILL_IMPROVEMENT protocol, propose editing the skill file"
     source: "SKILL.md routing table — skill correction → edit skill file"
 
   - name: "personal-preference-routes-to-memory"
@@ -33,8 +37,10 @@ cases:
           - "memory"
           - "preference"
           - "remember"
-      - type: not-contains
-        value: "CLAUDE.md"
+      - type: decision-trace
+        input: "user preference is personal (terse responses), not a team standard"
+        rule: "Check For #3: Personal learnings → MEMORY_CAPTURE"
+        result: "Route to MEMORY_CAPTURE protocol, save as feedback-type auto memory"
     source: "SKILL.md routing table — personal preference → auto memory (feedback type)"
 
   - name: "no-learnings-found"
@@ -52,3 +58,130 @@ cases:
           - "no corrections"
           - "didn't find"
     source: "Edge case — empty conversation with no feedback"
+
+  # --- New cases from Layer 4 exploratory (2026-03-30) ---
+
+  - name: "general-preference-routes-to-claude-md"
+    description: "Team-wide environment standard routes to GENERAL_IMPROVEMENT / project CLAUDE.md"
+    category: happy-path
+    inputs:
+      command: "/retrospective"
+      state:
+        conversation_context: "User said 'No, we use pnpm in this project, not npm' after Claude ran npm install. This is a team-wide environment standard."
+    assert:
+      - type: contains-any
+        values:
+          - "GENERAL_IMPROVEMENT"
+          - "CLAUDE.md"
+          - "general preference"
+          - "project CLAUDE"
+      - type: decision-trace
+        input: "team-wide environment standard (package manager)"
+        rule: "Check For #2: General preferences → GENERAL_IMPROVEMENT"
+        result: "Route to GENERAL_IMPROVEMENT protocol, propose adding to project CLAUDE.md"
+    source: "Exploratory test 2026-03-30, scenario general-preference-routes-to-claude-md — covers Row 2"
+
+  - name: "new-skill-opportunity-routes-to-creation"
+    description: "Successful novel workflow with no existing skill routes to SKILL_CREATION"
+    category: happy-path
+    inputs:
+      command: "/retrospective"
+      state:
+        conversation_context: "User asked to check status of PRs #421, #425, #430. Claude used parallel gh api calls. User said 'Perfect, that was fast'. No existing skill covers batch PR status checks."
+    assert:
+      - type: contains-any
+        values:
+          - "SKILL_CREATION"
+          - "new skill"
+          - "Save as a new skill"
+      - type: decision-trace
+        input: "successful novel workflow, no existing skill"
+        rule: "Check For #4: New skill opportunity → SKILL_CREATION"
+        result: "Route to SKILL_CREATION protocol, propose creating a new skill"
+    source: "Exploratory test 2026-03-30, scenario new-skill-opportunity-routes-to-creation — covers Row 4"
+
+  - name: "ambiguous-skill-vs-general-boundary"
+    description: "Cross-cutting correction (skill involved but preference is general) exposes routing ambiguity"
+    category: boundary
+    inputs:
+      command: "/retrospective"
+      state:
+        conversation_context: "User said 'Always run tests before committing' after the commit skill committed without running tests. This preference applies to any skill that commits code, not just commit."
+    assert:
+      - type: contains-any
+        values:
+          - "ambig"
+          - "cross-cutting"
+          - "both"
+          - "GENERAL_IMPROVEMENT"
+      - type: contains-any
+        values:
+          - "SKILL_IMPROVEMENT"
+          - "skill correction"
+          - "commit skill"
+          - "commit"
+    source: "Exploratory test 2026-03-30, scenario ambiguous-skill-vs-general — findings 2,3: routing conflict between Memory Routing table and SKILL_IMPROVEMENT evaluation gate"
+
+  - name: "multiple-learnings-both-detected"
+    description: "Conversation with two distinct learnings — both should be identified and routed separately"
+    category: freeform
+    inputs:
+      command: "/retrospective"
+      state:
+        conversation_context: "Two things happened: (1) The commit skill added emojis and user said 'No emojis in commits'. (2) User mentioned 'We're freezing merges after 2026-04-02 for the mobile release'."
+    assert:
+      - type: contains-all
+        values:
+          - "commit"
+          - "emoji"
+      - type: contains-any
+        values:
+          - "merge freeze"
+          - "2026-04-02"
+          - "mobile release"
+      - type: contains-any
+        values:
+          - "SKILL_IMPROVEMENT"
+          - "skill file"
+          - "skill correction"
+      - type: contains-any
+        values:
+          - "MEMORY_CAPTURE"
+          - "memory"
+          - "project context"
+    source: "Exploratory test 2026-03-30, scenario multiple-learnings-combined — finding 5: multiple learnings handling unspecified"
+
+  - name: "general-improvement-checks-existing"
+    description: "When preference already exists in CLAUDE.md, skill should detect and avoid duplicate"
+    category: regression
+    inputs:
+      command: "/retrospective"
+      state:
+        conversation_context: "User said 'We use pnpm, not npm' but the root CLAUDE.md already contains '- Package manager: pnpm'. The preference is already documented."
+    assert:
+      - type: contains-any
+        values:
+          - "already"
+          - "exists"
+          - "documented"
+          - "duplicate"
+    source: "Exploratory test 2026-03-30 — finding 6: GENERAL_IMPROVEMENT has no duplicate-checking step"
+
+  - name: "nothing-found-explicit-message"
+    description: "When no learnings found, output should be a clear user-friendly message"
+    category: regression
+    inputs:
+      command: "/retrospective"
+      state:
+        conversation_context: "User asked Claude to explain what a git branch is. Claude explained. No corrections, no preferences, no new patterns."
+    assert:
+      - type: contains-any
+        values:
+          - "nothing"
+          - "no learnings"
+          - "no corrections"
+          - "didn't find"
+          - "no improvements"
+      - type: llm-rubric
+        value: "The output clearly communicates that no learnings were found, in a friendly and non-technical way. It should not suggest changes or propose edits to any files."
+    source: "Exploratory test 2026-03-30 — finding 7: no 'nothing found' output template in skill"
