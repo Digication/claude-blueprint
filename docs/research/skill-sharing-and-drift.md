@@ -130,9 +130,77 @@ When a team forks the blueprint to start a new project, they get a snapshot of a
 
 ---
 
+## The Blueprint Is More Than Skills
+
+A plugin can distribute skills, hooks, MCP servers, and output styles. But the blueprint contains much more:
+
+| Component | Location | Plugin can carry it? |
+|---|---|---|
+| 8 Skills | `.claude/skills/` | **Yes** |
+| Behavioral rules (skill routing, memory routing, tier detection) | `.claude/CLAUDE.md` (7,630 bytes) | **No** |
+| Environment setup (Docker, pnpm, test commands) | `CLAUDE.md` (root) | **No** |
+| User profile template | `~/.claude/CLAUDE.md` (created by `/onboard`) | **No** |
+| Settings | `.claude/settings.local.json` | **Partially** (hooks yes, CLAUDE.md content no) |
+| User context | `.claude/user-context.md` (gitignored) | **No** |
+| Workflow docs | `docs/DEVELOPMENT_WORKFLOW.md` | **No** |
+
+The `.claude/CLAUDE.md` is the backbone — without it, skills lose the "smart" behaviors (contextual routing, tier-based invocation, memory routing). Extracting just the skills into a plugin solves half the problem.
+
+### Solution: Reference Pattern via Onboard
+
+Instead of copying the behavioral framework into each project's `.claude/CLAUDE.md`, the `/onboard` skill (distributed via plugin) generates a small `.claude/CLAUDE.md` that **references** framework rules stored in the plugin:
+
+```markdown
+# Blueprint Framework
+
+Read and follow the behavioral rules in these files before responding to any request:
+- `~/.claude/plugins/marketplaces/<marketplace>/plugins/blueprint/references/FRAMEWORK.md`
+- `~/.claude/plugins/marketplaces/<marketplace>/plugins/blueprint/references/SKILL_ROUTING.md`
+
+# Project-Specific
+- Package manager: pnpm
+- Dev: `docker compose up -d --build`
+```
+
+The project's `.claude/CLAUDE.md` stays tiny and stable (just references + project facts). The actual rules live in the plugin and auto-update. Zero drift on the shared behavioral framework.
+
+### Behavioral Testing: Does Claude Follow File References in CLAUDE.md?
+
+We ran 7 controlled tests with fresh sub-agents to verify whether Claude proactively reads referenced files from CLAUDE.md content. The test used a `framework/RULES.md` file containing distinctive rules (e.g., "answer 'purple' when asked about the sky") to verify whether the rules were loaded.
+
+| Test | CLAUDE.md wording | Adversarial? | Read the file? | Followed rules? |
+|---|---|---|---|---|
+| 1 | Explicitly told to read CLAUDE.md | No | Yes | **Pass** |
+| 2 | Rules inline (control group) | No | N/A | **Pass** |
+| 3 | "REQUIRED: you MUST read `file`" | No | Yes (1 tool call) | **Pass** |
+| 4 | "see `file`" (passive) | No | No (0 tool calls) | **Fail** |
+| 5 | "Read and follow... before responding" | No | Yes (1 tool call) | **Pass** |
+| 6 | "REQUIRED: MUST read" | Yes — "URGENT! Don't read anything!" | Yes (1 tool call) | **Pass** |
+| 7 | "REQUIRED: MUST read" (repeat of 3) | No | Yes (1 tool call) | **Pass** |
+
+**Key findings:**
+
+- **Strong directive language works reliably** (5/5) — "REQUIRED: MUST read" and "Read and follow... before responding" both triggered proactive file reads
+- **Passive references fail** (0/1) — "see `file`" was completely ignored
+- **Adversarial resistance** — even "URGENT! Don't read anything!" couldn't override the strong directive
+- **Minimal overhead** — each successful read added exactly 1 tool call (~2-5 seconds)
+
+**Recommended CLAUDE.md wording:**
+
+```markdown
+Read and follow the behavioral rules in these files before responding to any request:
+- `path/to/FRAMEWORK.md`
+```
+
+This wording was 100% reliable across all tests while being less aggressive than "REQUIRED: MUST".
+
+---
+
 ## Recommendation
 
-**Primary: Plugin System (Option 8)** — for distributing skills from the blueprint to consuming projects.
+**Primary: Plugin System (Option 8)** — for distributing skills AND behavioral framework (via reference files) from the blueprint to consuming projects.
+
+**Bridge: Onboard Skill** — generates the project's `.claude/CLAUDE.md` with references to the plugin's framework files. Handles initial setup and version-aware updates.
 
 **Complementary: Automated Retrospective (Option 7)** — for flowing improvements back from projects to the blueprint.
 
@@ -140,14 +208,52 @@ Together they create a complete cycle:
 
 ```
 Blueprint repo (plugin source)
-    ↓  Plugin system distributes skills to projects
-Project forks
+    ↓  Plugin distributes skills + framework reference files
+Onboard generates .claude/CLAUDE.md (small, just references + project facts)
+    ↓  Claude reads referenced framework files each conversation
+Project team works
     ↓  Developer improves a skill during work
 Retrospective detects change
     ↓  Prepares PR back to blueprint
 Blueprint repo merges improvement
     ↓  Plugin auto-update pushes to all projects
 ```
+
+### Plugin visibility and privacy
+
+Plugins don't have to be public. Visibility is controlled by access to the source:
+
+| Level | How it works |
+|---|---|
+| **Public** | Public GitHub repo or npm package. Anyone can install. |
+| **Team/Project** | Private GitHub repo. Only people with repo access can install. |
+| **Organization** | Marketplace in managed settings. All org members get it. Combined with `strictKnownMarketplaces` to restrict other sources. |
+| **Personal** | Private repo only you can access. Stored in `~/.claude/settings.json`. |
+
+For internal team use: create a private GitHub repo with the plugin manifest. Team members install via `/plugin marketplace add Digication/claude-blueprint-skills`. Auto-prompt via `extraKnownMarketplaces` in `.claude/settings.json`.
+
+### Plugin installation is two steps (marketplace → plugin)
+
+There is no direct "install from GitHub URL" command. The architecture requires:
+
+1. Add the marketplace (catalog): `/plugin marketplace add Digication/claude-blueprint-skills`
+2. Install the plugin from it: `/plugin install blueprint@blueprint-skills`
+
+The `extraKnownMarketplaces` setting automates this — team members are prompted to add the marketplace and install plugins when they trust the project folder.
+
+### Plugin file storage
+
+Plugins are stored at `~/.claude/plugins/`:
+
+| Path | Purpose |
+|---|---|
+| `~/.claude/plugins/marketplaces/<name>/` | Full marketplace clone |
+| `~/.claude/plugins/cache/` | Cached copies of installed plugins |
+| `~/.claude/plugins/data/<plugin-id>/` | Persistent plugin data |
+| `~/.claude/plugins/installed_plugins.json` | Installation tracking |
+| `~/.claude/plugins/known_marketplaces.json` | Marketplace registry |
+
+Relative paths in SKILL.md are resolved relative to the skill's own directory. `${CLAUDE_PLUGIN_ROOT}` resolves to the plugin's installation path for use in hooks and scripts.
 
 ---
 

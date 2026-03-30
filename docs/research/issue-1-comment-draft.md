@@ -8,9 +8,13 @@ Did some research on this — evaluated all four options from the RFC plus a few
 
 ## TL;DR
 
-**Recommended: Claude Code Plugin System + Automated Retrospective**
+**Recommended: Plugin System + Onboard-as-Bridge + Automated Retrospective**
 
-The plugin system is Anthropic's official distribution mechanism — purpose-built for sharing skills across projects. It avoids every technical blocker found in the other approaches (symlinks, postinstall scripts, Docker volumes). Pairing it with an enhanced `/retrospective` creates a full cycle: plugins push skills out, retrospective flows improvements back.
+The plugin system is Anthropic's official distribution mechanism — purpose-built for sharing skills across projects. But the blueprint is more than skills: the `.claude/CLAUDE.md` behavioral framework (7,630 bytes of skill routing, memory routing, tier detection) can't be distributed via plugin directly.
+
+The solution: the `/onboard` skill (distributed via plugin) generates a small `.claude/CLAUDE.md` that **references** framework rules stored in the plugin. The actual rules auto-update with the plugin; the project file stays tiny and stable.
+
+We verified this reference pattern with 7 controlled tests — strong directive wording ("Read and follow these files before responding") was **100% reliable** across all tests, including adversarial prompts trying to bypass the read.
 
 ## Options evaluated
 
@@ -25,36 +29,37 @@ The plugin system is Anthropic's official distribution mechanism — purpose-bui
 | 7. Automated retrospective | Good accelerator but only handles push-back, not distribution |
 | **8. Plugin system** | **Best fit** — official, no symlinks, versioned, auto-updates, works in Docker, enterprise-ready |
 
+## The blueprint is more than skills
+
+A plugin can carry skills but NOT `.claude/CLAUDE.md` content. The behavioral framework (contextual skill routing, memory routing, tier detection) would be lost if we only extracted skills. The reference pattern solves this:
+
+```
+Plugin carries:  skills + framework reference files (auto-updated)
+Onboard creates: .claude/CLAUDE.md with references to plugin files (tiny, stable)
+Claude reads:    referenced framework files each conversation (verified reliable)
+```
+
+## Reference pattern test results
+
+| Wording in CLAUDE.md | Followed rules? |
+|---|---|
+| "REQUIRED: MUST read `file`" | **Yes** (5/5 tests, including adversarial) |
+| "Read and follow... before responding" | **Yes** (1/1) |
+| "see `file`" (passive) | **No** — completely ignored |
+
+Strong directive language is required. Passive references don't work.
+
 ## Critical gap: retrospective provenance
 
-For the retrospective to prepare PRs back to the blueprint, it needs to know **where a skill came from**. Currently it doesn't — it just looks in `.claude/skills/` and assumes everything is editable.
-
-Skills can live in four places (project, personal `~/.claude/skills/`, plugin, enterprise-managed), and the correct action differs for each:
-
-| Origin | What retrospective should do |
-|---|---|
-| Project skill (no upstream) | Edit directly |
-| Project skill overriding a plugin | Ask: update local or PR upstream? |
-| Plugin skill | Can't edit — offer local override or upstream PR |
-| Personal skill | Warn: "this affects all your projects" |
-| Enterprise-managed | Can't edit — tell user to contact admin |
-
-This provenance detection is a prerequisite before Option 7 (automated retrospective) can work reliably in a plugin-based setup.
+For the retrospective to prepare PRs back to the blueprint, it needs to know **where a skill came from**. Currently it doesn't — it just looks in `.claude/skills/` and assumes everything is editable. Skills can live in four places (project, personal, plugin, enterprise-managed), and the correct action differs for each. This provenance detection is a prerequisite for the automated return-path.
 
 ## On the "Immediate Skill Improvement" (/implement Direct Mode)
 
-Evaluated all five proposed changes against the current 4-step Direct Mode. All are defensible as false positives — the current mode is intentionally lightweight and the proposed additions add ceremony appropriate for Plan/Execute Mode but counterproductive for Direct Mode's "just do it" scope:
-
-- **"Analyze" (add UI screenshots)** → current step 1 already reads code; screenshots add overhead disproportionate to small changes
-- **"Plan" (one-sentence plan)** → the user's request IS the plan; Plan Mode exists for when planning matters
-- **"Implement"** → identical to current
-- **"Verify" (browser checks)** → Execute Mode already has this; for small changes, the developer's own eyes are faster
-- **"Report" (expanded format)** → already happens naturally via Claude's default behavior
-
-The one to watch is browser verification — if real bugs start slipping through because Direct Mode didn't check, that's the first place to reconsider.
+Evaluated all five proposed changes against the current 4-step Direct Mode. All are defensible as false positives — the current mode is intentionally lightweight. The one to watch is browser verification — if real bugs start slipping through, that's the first place to reconsider.
 
 ## Suggested next steps
 
-1. **Prototype the plugin structure** — add `.claude-plugin/plugin.json` to this repo and test the distribution flow
-2. **Add provenance detection to retrospective** — teach it to identify skill origin before proposing changes
-3. **Defer the /implement Direct Mode changes** — current behavior is adequate; revisit if evidence of real gaps emerges
+1. **Prototype the plugin structure** — add `.claude-plugin/plugin.json` to this repo, move behavioral framework into plugin reference files, test the reference pattern end-to-end
+2. **Update `/onboard`** — teach it to generate `.claude/CLAUDE.md` with references to plugin framework files (version-stamped, updatable)
+3. **Add provenance detection to `/retrospective`** — teach it to identify skill origin before proposing changes
+4. **Defer the /implement Direct Mode changes** — current behavior is adequate; revisit if evidence of real gaps emerges
