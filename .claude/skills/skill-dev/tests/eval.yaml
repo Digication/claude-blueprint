@@ -95,7 +95,7 @@ cases:
     source: "Exploratory test 2026-03-28, scenario test-with-scenario-arg — previously AMBIGUOUS, fixed. Updated to use fake-skill fixture."
 
   - name: "review-report-has-required-sections"
-    description: "Review mode produces report with all required sections"
+    description: "Review mode produces report with all required sections and covers all checklist categories"
     category: happy-path
     inputs:
       command: "/skill-dev review fake-skill"
@@ -103,6 +103,7 @@ cases:
         skill_exists: true
         skill_path: .claude/skills/skill-dev/tests/fixtures/fake-skill
         reviews_log_empty: true
+        review_type: true
     assert:
       - type: contains-all
         values:
@@ -112,10 +113,20 @@ cases:
           - "Recommendations"
           - "Suggestions"
           - "Strengths"
+      - type: contains-any
+        values:
+          - "Effectiveness"
+          - "effectiveness"
+      - type: contains-any
+        values:
+          - "bare Bash"
+          - "Bare Bash"
+          - "bare `Bash`"
+          - "Bash without"
       - type: llm-rubric
         rubric: "Review Quality"
-        context: "Full review of the fake-skill fixture at .claude/skills/skill-dev/tests/fixtures/fake-skill/ with no prior review history. The skill intentionally has bare Bash in allowed-tools (a known issue the review should catch)."
-    source: "SKILL.md lines 82-89 define the required report format. Updated to use fake-skill fixture."
+        context: "Full review of the fake-skill fixture at .claude/skills/skill-dev/tests/fixtures/fake-skill/ with no prior review history. The skill intentionally has bare Bash in allowed-tools (a known issue the review should catch). The agent must use the review-specific prompt from TEST_PROTOCOL.md."
+    source: "SKILL.md lines 82-89 define the required report format. Updated to use fake-skill fixture. Added Effectiveness and bare-Bash assertions to catch the L3 failure mode."
 
   - name: "scenario-approval-table-format"
     description: "Explore mode presents scenarios in the specified table format before running"

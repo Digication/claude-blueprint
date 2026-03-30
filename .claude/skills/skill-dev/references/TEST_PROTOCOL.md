@@ -44,6 +44,34 @@ THIS IS A DRY-RUN. You only have Read, Glob, and Grep tools. Report all output �
 [PASS / FAIL / AMBIGUOUS]
 ```
 
+## Review-Type Cases
+
+When the test case simulates a **review** command (e.g., `/skill-dev review <skill>`), the agent must produce a realistic review report — not just trace the workflow. The standard template above is not sufficient for review cases.
+
+**Additional instructions for review-type agents:**
+
+```
+## IMPORTANT: Review Simulation Rules
+
+You are simulating a REVIEW of a real skill. You MUST:
+
+1. READ the target skill file at {skill_path}/SKILL.md and all its references BEFORE writing any findings
+2. Every finding MUST reference specific content from the file — cite the line, section, or exact text
+3. NEVER use conditional language ("if the skill has...", "if this uses...") — you have the file, check it
+4. Walk through EVERY section of CHECKLIST.md and state the result:
+   - Metadata Validation: [each item — PASS/FAIL with evidence]
+   - Structure: [each item]
+   - Content Quality: [each item]
+   - Decision Logic: [each item, or N/A if no decision tables]
+   - Scripts: [each item, or N/A if no scripts]
+   - Effectiveness: [each item]
+5. For items that PASS, a one-line note is fine. For items that FAIL, explain what's wrong and how to fix it.
+
+A review that says "could be improved" without saying how, or flags issues without verifying them, will FAIL the quality rubric.
+```
+
+**How to detect review-type cases:** If the test case's `inputs.command` contains the word `review`, or if the case's `assert` includes an `llm-rubric` with rubric name "Review Quality", use the review-specific prompt above in addition to the standard template.
+
 ## Spawning
 
 - Run independent scenarios in parallel (up to 4)

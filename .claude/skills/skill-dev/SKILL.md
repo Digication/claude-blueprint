@@ -116,7 +116,7 @@ Multi-layer testing system. Each layer catches different kinds of issues. See [E
 
 2. **Layer 2: Golden dataset**
    - Load `<skill>/tests/eval.yaml` (see [FIXTURE_FORMAT.md](references/FIXTURE_FORMAT.md))
-   - For each test case, spawn a read-only agent (Read, Glob, Grep only) with the case's inputs
+   - For each test case, spawn a read-only agent (Read, Glob, Grep only) with the case's inputs. For review-type cases (command contains "review" or state has `review_type: true`), use the review-specific prompt from [TEST_PROTOCOL.md](references/TEST_PROTOCOL.md) — the agent must read the target skill and verify findings against it.
    - Check agent output against deterministic assertions: `contains`, `regex`, `not-contains`, `contains-all`, `contains-any`, `decision-trace`
    - If any case FAILs → stop, report failures with assertion details
    - If no fixture file exists → skip Layer 2, warn: "No golden dataset found. Run `--explore` to create one."
@@ -243,6 +243,7 @@ Two-phase workflow for skills that touch the real file system, git, or global co
 
 - The validate script only checks metadata format — it does NOT check content quality. A passing validation is not a full review.
 - Test agents sometimes "help" by inferring missing rules instead of flagging them as Gaps. The test prompt must explicitly say: flag ambiguity, don't fill in gaps yourself.
+- Review-type test agents take shortcuts — they use "if the skill has..." instead of reading the target file. Use the review-specific prompt from TEST_PROTOCOL.md to force them to read the file and cite specific content. Without this, the Review Quality rubric will fail every time.
 - Bare `Bash` (without command restriction) in allowed-tools is the #1 review finding — always flag it.
 - Self-critique often produces generic "looks good" output. Push for specific checklist item references — "checklist item X was not covered" is useful, "review was thorough" is not.
 - When testing decision-heavy skills, agents tend to skip "Other/freeform" inputs. Explicitly include them in scenarios.
