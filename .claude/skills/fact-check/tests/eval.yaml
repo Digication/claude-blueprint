@@ -1,6 +1,6 @@
 skill: fact-check
 description: Golden dataset for fact-check skill — claim triage and verdict accuracy
-skill_hash: "5c11a43b86e634e55cf6c8edc90c1891"
+skill_hash: "9be227bbbc4473501a712be9e650f108"
 
 cases:
   - name: "hedged-claim-gets-checked"
@@ -52,3 +52,135 @@ cases:
           - "no verifiable"
           - "no claims"
     source: "SKILL.md — zero claims = early exit"
+
+  - name: "user-statement-restatement-handled"
+    description: "Claims Claude attributes back to the user ('as you mentioned') should be handled consistently — either skipped or flagged"
+    category: regression
+    inputs:
+      command: "/fact-check"
+      state:
+        last_response: "As you mentioned, the tests run in Docker containers. Based on your description, the API handles about 1000 requests per second."
+    assert:
+      - type: contains-any
+        values:
+          - "Nothing to verify"
+          - "user"
+          - "you mentioned"
+          - "attributed"
+          - "Unverifiable"
+    source: "Layer 4 exploratory 2026-03-30, scenario user-statement-skipped — exclusion rule ambiguity for restated user claims"
+
+  - name: "mixed-facts-and-opinions-separated"
+    description: "Verifiable sub-claims inside opinion sentences should be addressed — either extracted or explicitly noted"
+    category: regression
+    inputs:
+      command: "/fact-check"
+      state:
+        last_response: "The `pnpm test` command runs Jest under the hood. I'd recommend adding more unit tests for edge cases. The test coverage is currently at 85% according to the last CI run. You should probably use vitest instead — it's faster."
+    assert:
+      - type: contains-any
+        values:
+          - "Jest"
+          - "pnpm test"
+      - type: contains-any
+        values:
+          - "recommend"
+          - "opinion"
+          - "recommendation"
+          - "skipped"
+          - "skip"
+      - type: contains-any
+        values:
+          - "Supported"
+          - "Contradicted"
+          - "Unverifiable"
+          - "Nothing to verify"
+    source: "Layer 4 exploratory 2026-03-30, scenario mixed-claims-and-opinions — fact/opinion interleaving ambiguity"
+
+  - name: "budget-cap-triggers-at-twelve-claims"
+    description: "12 claims should trigger the 10-claim budget cap with skipped claims disclosed"
+    category: regression
+    inputs:
+      command: "/fact-check"
+      state:
+        last_response: "Here's what I found about the codebase: 1) The entry point is `src/index.ts`. 2) Express is used for routing. 3) The database uses PostgreSQL via Prisma ORM. 4) Authentication is handled by Passport.js. 5) Tests use Jest with 90% coverage. 6) The CI pipeline runs on GitHub Actions. 7) Docker is used for deployment. 8) Redis handles session storage. 9) The API follows REST conventions. 10) Rate limiting uses the `express-rate-limit` package. 11) Logging uses Winston. 12) The project uses TypeScript 5.3."
+    assert:
+      - type: contains-any
+        values:
+          - "budget"
+          - "cap"
+          - "10"
+          - "skipped"
+          - "not checked"
+      - type: not-contains
+        value: "12 claims checked"
+    source: "Layer 4 exploratory 2026-03-30, scenario budget-cap-many-claims — budget discipline prioritization ambiguity"
+
+  - name: "git-history-claim-routed-correctly"
+    description: "Git history claims should route to git log/diff tools for verification"
+    category: regression
+    inputs:
+      command: "/fact-check"
+      state:
+        last_response: "That bug was fixed in the last commit by adding a null check. The commit also removed the deprecated `legacyAuth` middleware."
+    assert:
+      - type: contains-any
+        values:
+          - "Git history"
+          - "git log"
+          - "git diff"
+          - "commit"
+      - type: contains-any
+        values:
+          - "Supported"
+          - "Contradicted"
+          - "Unverifiable"
+    source: "Layer 4 exploratory 2026-03-30, scenario git-history-claim — batching and template gaps for commit-scoped claims"
+
+  - name: "code-existence-claim-typed-and-routed"
+    description: "File-path claims should be extracted and routed to filesystem verification tools"
+    category: regression
+    inputs:
+      command: "/fact-check"
+      state:
+        last_response: "The database configuration is defined in `src/config/database.ts` and the migration scripts are in the `db/migrations/` folder."
+    assert:
+      - type: contains-any
+        values:
+          - "Code existence"
+          - "Project structure"
+          - "Glob"
+      - type: contains-any
+        values:
+          - "src/config/database.ts"
+          - "db/migrations"
+      - type: contains-any
+        values:
+          - "Supported"
+          - "Contradicted"
+          - "Unverifiable"
+    source: "Layer 4 exploratory 2026-03-30, scenario code-existence-claim — type overlap between Code existence and Project structure"
+
+  - name: "code-behavior-claim-gets-read-tools"
+    description: "Code behavior claims should route to Read/Glob/Grep tools for function tracing"
+    category: regression
+    inputs:
+      command: "/fact-check"
+      state:
+        last_response: "The `calculateTotal` function in `src/utils/pricing.ts` returns null when the cart is empty instead of returning 0."
+    assert:
+      - type: contains-any
+        values:
+          - "Code behavior"
+          - "calculateTotal"
+      - type: contains-any
+        values:
+          - "Read"
+          - "Glob"
+          - "Grep"
+      - type: contains-any
+        values:
+          - "Supported"
+          - "Contradicted"
+          - "Unverifiable"
+    source: "Layer 4 exploratory 2026-03-30, scenario code-behavior-claim — compound claim decomposition ambiguity"

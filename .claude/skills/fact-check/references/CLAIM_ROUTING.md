@@ -45,6 +45,8 @@ what is stated below. Verify using evidence only.
 
 ## Type-Specific Instructions
 
+> **Evaluation order**: The sections below are listed in priority order. When a claim could match multiple types, use the first matching section (top to bottom). See the type precedence table in SKILL.md for the full rule.
+
 ### Code Behavior
 **Tools**: `Read, Glob, Grep`
 
@@ -107,13 +109,16 @@ what is stated below. Verify using evidence only.
 **Tools**: `Bash(git log:*), Bash(git diff:*)`
 
 ```
+0. Fast-path for "last commit" / "recent commit" claims: Run `git show HEAD --stat` first
+   to identify the commit, then `git diff HEAD~1..HEAD` to see changes. This avoids
+   searching through the full log when the claim explicitly references the most recent commit.
 1. Search git log for the event mentioned (commit, change, author)
 2. Use appropriate flags: --oneline for overview, --author for person, --since/--until for dates
 3. If the claim is about what changed, use git diff to see actual changes
 4. Report the actual commit hash and message as evidence
 ```
 
-**Search hints format**: Time range, file affected, author, or commit message keywords.
+**Search hints format**: Time range, file affected, author, commit message keywords, or explicit commit reference (HEAD, "last commit", "recent").
 
 ---
 
@@ -128,6 +133,21 @@ what is stated below. Verify using evidence only.
 ```
 
 **Search hints format**: Standard name, section, specific rule or definition claimed.
+
+---
+
+### CI / Runtime Artifact
+**Tools**: `Glob, Grep, Read, Bash(git log:*)`
+
+```
+1. Identify what the claim references — coverage report, CI log, build output, or runtime measurement
+2. Search for local artifact files first (coverage/*.json, .nyc_output/*, lcov.info, junit.xml, etc.)
+3. If the claim references a CI-generated metric, check whether a local report file exists that can confirm it
+4. If no local artifact exists, verdict is Unverifiable — do not guess from code alone
+5. For claims about "the last CI run" or "the latest build", note that local artifacts may be stale
+```
+
+**Search hints format**: Metric type (coverage, build time, test count), CI system if mentioned, artifact file paths if known.
 
 ---
 
@@ -154,6 +174,37 @@ Provide a separate verdict for each claim.
 ### Claim 1: "{claim_1}"
 - **Verdict**: Supported | Contradicted | Unverifiable
 - **Evidence**: [line number and relevant code]
+- **Explanation**: [one sentence]
+
+[repeat for each claim]
+```
+
+---
+
+## Batching Same-Commit Claims
+
+When multiple claims reference the same git commit (e.g., "the last commit added X and removed Y"), batch them into one agent:
+
+```
+You are an independent fact-checker verifying multiple claims about the same git commit.
+
+## Claims to Verify
+1. "{claim_1}"
+2. "{claim_2}"
+
+## Commit to Examine
+{commit_ref} (e.g., HEAD, abc123, "last commit")
+
+## Instructions
+1. Run `git log -1 {commit_ref}` to identify the exact commit
+2. Run `git diff {commit_ref}~1..{commit_ref}` to see what changed
+3. Verify each claim independently against the diff output
+4. Provide a separate verdict for each claim
+
+## Output Format (per claim)
+### Claim 1: "{claim_1}"
+- **Verdict**: Supported | Contradicted | Unverifiable
+- **Evidence**: [commit hash, changed files, relevant diff lines]
 - **Explanation**: [one sentence]
 
 [repeat for each claim]
