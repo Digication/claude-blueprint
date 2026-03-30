@@ -255,6 +255,65 @@ Plugins are stored at `~/.claude/plugins/`:
 
 Relative paths in SKILL.md are resolved relative to the skill's own directory. `${CLAUDE_PLUGIN_ROOT}` resolves to the plugin's installation path for use in hooks and scripts.
 
+### Plugin update mechanics
+
+**When updates are checked:** At startup, when auto-update is enabled for the marketplace. No background polling during a session.
+
+**How users are notified:** If any plugins were updated, a notification prompts the user to run `/reload-plugins` to activate the new versions. Updates are not silent — the user must opt in to activate them.
+
+**Auto-update defaults:**
+
+| Marketplace type | Auto-update default |
+|---|---|
+| Official Anthropic | **Enabled** by default |
+| Third-party (your private repo) | **Disabled** by default |
+
+For a private team marketplace, each member enables auto-update once via `/plugin` UI → Marketplaces tab → select marketplace → "Enable auto-update". After that, they're notified at startup whenever the plugin changes.
+
+**Manual update commands:**
+
+| Command | Purpose |
+|---|---|
+| `/plugin marketplace update <name>` | Refresh the marketplace catalog |
+| `claude plugin update <plugin>@<marketplace>` | Update a specific plugin |
+| `/reload-plugins` | Activate updated plugins in the current session |
+
+**Important caching behavior:** If plugin code changes but the `version` field in `plugin.json` is not bumped, existing users **will not see the changes** due to caching. Always bump the version on every update.
+
+**Private repo auto-updates:** Background auto-updates run at startup without interactive credential helpers. To enable auto-updates for private marketplaces, set environment tokens in your shell config:
+
+| Provider | Environment variable |
+|---|---|
+| GitHub | `GITHUB_TOKEN` or `GH_TOKEN` (needs `repo` scope) |
+| GitLab | `GITLAB_TOKEN` or `GL_TOKEN` |
+| Bitbucket | `BITBUCKET_TOKEN` |
+
+**Version pinning:**
+
+| Method | Config | Use case |
+|---|---|---|
+| Branch/tag | `"ref": "v2.0.0"` in marketplace.json source | Pin to a release |
+| Exact commit | `"sha": "a1b2c3d4..."` (40-char) in marketplace.json source | Pin to exact commit |
+| npm semver | `"version": "^2.0.0"` in marketplace.json source | For npm-sourced plugins |
+
+**Release channels:** No built-in stable/latest toggle per plugin. Workaround: create two marketplaces pointing to different branches of the same repo (e.g., `stable-tools` → `ref: "stable"`, `latest-tools` → `ref: "latest"`). Assign each to user groups via managed settings. Each ref must have a different `version` in `plugin.json` — if two refs have the same version, Claude Code skips the update.
+
+**Disabling auto-updates:**
+
+| Goal | Config |
+|---|---|
+| Disable ALL auto-updates | `"env": { "DISABLE_AUTOUPDATER": "1" }` in settings |
+| Disable Claude Code updates but keep plugin updates | `DISABLE_AUTOUPDATER=true` + `FORCE_AUTOUPDATE_PLUGINS=true` |
+| Disable per-marketplace | `/plugin` UI → Marketplaces → select → "Disable auto-update" |
+
+**Practical team setup:**
+
+1. Team members install the marketplace once (auto-prompted via `extraKnownMarketplaces`)
+2. They enable auto-update for the marketplace (one-time toggle)
+3. From then on: start Claude Code → checks for updates → notifies → `/reload-plugins`
+
+The main friction point: third-party auto-update is off by default. Each person flips it on once. `/onboard` could remind them to do this.
+
 ---
 
 ## Critical Gap: Retrospective Provenance Awareness
