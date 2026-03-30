@@ -25,6 +25,9 @@ cases:
         values:
           - "Which skill"
           - "which skill"
+      - type: llm-rubric
+        rubric: "Error Message Quality"
+        context: "User ran /skill-dev review nonexistent-skill — skill name does not exist"
     source: "Exploratory test 2026-03-28, scenario invalid-skill-name"
 
   - name: "review-history-recent-no-changes"
@@ -102,6 +105,9 @@ cases:
           - "Recommendations"
           - "Suggestions"
           - "Strengths"
+      - type: llm-rubric
+        rubric: "Review Quality"
+        context: "Full review of the commit skill with no prior review history"
     source: "SKILL.md lines 82-89 define the required report format"
 
   - name: "scenario-approval-table-format"
@@ -121,6 +127,9 @@ cases:
         values:
           - "Ready to run"
           - "ready to run"
+      - type: llm-rubric
+        rubric: "Test Scenario Quality"
+        context: "Exploratory test scenarios designed for the commit skill"
     source: "SKILL.md lines 114-122 define scenario approval format — added during fix round"
 
   - name: "no-args-lists-skills"
@@ -141,3 +150,94 @@ cases:
           - "which skill"
           - "What would you like"
     source: "Exploratory test 2026-03-28, scenario no-args-flow"
+
+  - name: "full-mode-l2-fail-still-offers-l4"
+    description: "In --full mode, Layer 2 failure skips L3 but still offers Layer 4"
+    category: regression
+    inputs:
+      command: "/skill-dev test someskill --full"
+      state:
+        layer1_result: PASS
+        layer2_result: "first case FAIL"
+        has_eval_yaml: true
+    assert:
+      - type: contains
+        value: "FAIL"
+      - type: contains-any
+        values:
+          - "Layer 4"
+          - "exploratory"
+          - "Exploratory"
+      - type: contains-any
+        values:
+          - "Ready to run"
+          - "ready to run"
+          - "Want me to run"
+          - "run exploratory"
+      - type: not-contains
+        value: "Layer 3: LLM-as-Judge — PASS"
+    source: "Exploratory test 2026-03-30, scenario full-l2-fail-still-offers-l4"
+
+  - name: "layer-3-standalone-no-rubrics-reports-pass"
+    description: "--layer 3 with no llm-rubric assertions reports PASS with a note"
+    category: regression
+    inputs:
+      command: "/skill-dev test someskill --layer 3"
+      state:
+        has_eval_yaml: true
+        has_llm_rubrics: false
+    assert:
+      - type: contains
+        value: "PASS"
+      - type: contains-any
+        values:
+          - "no rubrics"
+          - "No rubrics"
+          - "no llm-rubric"
+          - "No llm-rubric"
+          - "zero rubrics"
+    source: "Exploratory test 2026-03-30, scenario layer-3-standalone-no-rubrics"
+
+  - name: "full-mode-l1-fail-stops-everything"
+    description: "In --full mode, Layer 1 failure stops all layers including Layer 4"
+    category: regression
+    inputs:
+      command: "/skill-dev test someskill --full"
+      state:
+        layer1_result: FAIL
+    assert:
+      - type: contains
+        value: "FAIL"
+      - type: not-contains
+        value: "Ready to run"
+      - type: not-contains
+        value: "ready to run"
+      - type: contains-any
+        values:
+          - "Fix"
+          - "fix"
+          - "structural"
+          - "Structural"
+    source: "Exploratory test 2026-03-30, scenario full-l1-fail-stops-everything"
+
+  - name: "default-test-l2-skip-cascades-to-l3-skip"
+    description: "Default test with no eval.yaml skips both L2 and L3, reports PARTIAL"
+    category: regression
+    inputs:
+      command: "/skill-dev test someskill"
+      state:
+        layer1_result: PASS
+        has_eval_yaml: false
+    assert:
+      - type: contains
+        value: "PARTIAL"
+      - type: contains-any
+        values:
+          - "No golden dataset"
+          - "no eval.yaml"
+          - "Skipped"
+      - type: contains-any
+        values:
+          - "--explore"
+          - "explore"
+    source: "Exploratory test 2026-03-30, scenario default-test-l2-skip-cascades"
