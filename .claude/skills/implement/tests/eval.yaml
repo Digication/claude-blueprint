@@ -1,20 +1,22 @@
 skill: implement
-description: Golden dataset for implement skill — complexity evaluation and mode detection
+description: Golden dataset for implement skill — complexity evaluation, mode detection, and execution flows
 skill_hash: "0cef6a71790697064051da399e7caca0"
 
 cases:
   - name: "simple-change-goes-direct"
-    description: "A change touching 1-3 files should use direct implementation, not plan mode"
+    description: "A change touching 1-3 files should route to direct implementation, not plan mode"
     category: happy-path
     inputs:
       command: '/implement "Add a loading spinner to the login button"'
       state:
         estimated_files: 2
     assert:
+      - type: decision-trace
+        input: "estimated_files = 2, command = add"
+        rule: "Complexity Evaluation (1-3 files, single concern)"
+        result: "Direct implementation"
       - type: not-contains
-        value: "plan"
-      - type: not-contains
-        value: "Phase"
+        value: "docs/implementation-plan"
     source: "SKILL.md complexity table — 1-3 files = direct"
 
   - name: "complex-change-suggests-plan"
@@ -62,3 +64,125 @@ cases:
           - "unsaved"
           - "Stash"
     source: "SKILL.md pre-check — dirty state handled before implementation"
+
+  - name: "medium-complexity-task-tracking"
+    description: "4-10 file change routes to Direct + task tracking; skill must define what task tracking means"
+    category: boundary
+    inputs:
+      command: '/implement "Add internationalization support to the settings page"'
+      state:
+        estimated_files: 7
+        git_status: clean
+    assert:
+      - type: decision-trace
+        input: "estimated_files = 7, single area"
+        rule: "Complexity Evaluation (4-10 files, moderate scope)"
+        result: "Direct implementation with task tracking"
+      - type: not-contains
+        value: "docs/implementation-plan"
+    source: "Layer 4 exploratory 2026-03-30, scenario medium-complexity-with-tracking"
+
+  - name: "no-args-asks-what-to-build"
+    description: "No arguments and no existing plan should prompt the user for what to build"
+    category: freeform
+    inputs:
+      command: "/implement"
+      state:
+        git_status: clean
+        existing_plans: none
+    assert:
+      - type: contains-any
+        values:
+          - "What would you like to build"
+          - "What do you want to implement"
+          - "what to build"
+          - "what you'd like"
+      - type: not-contains
+        value: "docs/implementation-plan"
+    source: "Layer 4 exploratory 2026-03-30, scenario no-args-auto-detect"
+
+  - name: "execute-resumes-from-completed"
+    description: "Execute mode detects completed phases from git log and starts from first incomplete"
+    category: happy-path
+    inputs:
+      command: "/implement execute docs/implementation-plan/user-auth"
+      state:
+        git_status: clean
+        plan_phases: ["01-project-setup", "02-database-schema", "03-api-layer"]
+        completed_phases: ["01-project-setup"]
+    assert:
+      - type: decision-trace
+        input: "git log shows Phase 1 committed"
+        rule: "Execute Mode step 2 — check current state"
+        result: "Resume from phase 02"
+      - type: contains-any
+        values:
+          - "Phase 01"
+          - "Phase 1"
+          - "project-setup"
+          - "already complete"
+    source: "Layer 4 exploratory 2026-03-30, scenario execute-existing-plan"
+
+  - name: "resume-partial-phase"
+    description: "Resume at a phase that was partially attempted — skill should address stale work"
+    category: boundary
+    inputs:
+      command: "/implement resume docs/implementation-plan/user-auth 3"
+      state:
+        git_status: "?? src/auth/resolver.ts"
+        completed_phases: ["01", "02"]
+        phase_03_state: "partially created files, verification failed"
+    assert:
+      - type: contains-any
+        values:
+          - "uncommitted"
+          - "partial"
+          - "stale"
+          - "existing files"
+          - "Stash"
+          - "clean"
+      - type: decision-trace
+        input: "resume phase 3 with partial work on disk"
+        rule: "Pre-check dirty state OR Execute Mode resume"
+        result: "Handle stale partial work before re-running phase"
+    source: "Layer 4 exploratory 2026-03-30, scenario resume-from-phase"
+
+  - name: "explicit-direct-overrides-complexity"
+    description: "'Just do it' forces Direct mode even when complexity signals Plan mode"
+    category: override
+    inputs:
+      command: '/implement "Build a notification system — just do it, don''t plan"'
+      state:
+        estimated_files: 12
+        git_status: clean
+    assert:
+      - type: decision-trace
+        input: "estimated_files = 12, user says 'just do it'"
+        rule: "Complexity Evaluation — explicit override"
+        result: "Direct implementation regardless of complexity"
+      - type: not-contains
+        value: "docs/implementation-plan"
+    source: "Layer 4 exploratory 2026-03-30, scenario explicit-direct-override"
+
+  - name: "ambiguous-scope-asks-user"
+    description: "Borderline complexity (could be 4-10 or 10+) triggers the 'when in doubt, ask' fallback"
+    category: boundary
+    inputs:
+      command: '/implement "Refactor the data layer to use a repository pattern"'
+      state:
+        estimated_files: 6
+        scope_uncertain: true
+        git_status: clean
+    assert:
+      - type: contains-any
+        values:
+          - "plan"
+          - "directly"
+          - "phased"
+          - "how would you like"
+          - "want me to"
+      - type: decision-trace
+        input: "estimated_files = 6, scope uncertain"
+        rule: "Complexity Evaluation — when in doubt, ask"
+        result: "Ask user whether to plan or implement directly"
+    source: "Layer 4 exploratory 2026-03-30, scenario ambiguous-complexity-asks"
