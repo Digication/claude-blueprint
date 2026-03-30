@@ -1,6 +1,6 @@
 skill: skill-dev
 description: Golden dataset for skill-dev — regression tests from dry-run testing rounds
-skill_hash: "35ddca9012ad9d0c8c7a137a60d4afe0"
+skill_hash: "dfde600b177c0b0bbf66ff6cca9d392e"
 
 cases:
   - name: "invalid-skill-shows-error"
@@ -241,3 +241,76 @@ cases:
           - "--explore"
           - "explore"
     source: "Exploratory test 2026-03-30, scenario default-test-l2-skip-cascades"
+
+  - name: "single-scenario-missing-eval-yaml"
+    description: "test <skill> <scenario> when eval.yaml doesn't exist should error cleanly, not silently fail"
+    category: regression
+    inputs:
+      command: "/skill-dev test onboard happy-path-beginner"
+      state:
+        skill_exists: true
+        has_eval_yaml: false
+    assert:
+      - type: contains-any
+        values:
+          - "No golden dataset"
+          - "no eval.yaml"
+          - "eval.yaml does not exist"
+          - "no fixture file"
+      - type: contains-any
+        values:
+          - "--explore"
+          - "explore"
+      - type: not-contains
+        value: "Which case would you like to run"
+    source: "Exploratory test 2026-03-30, scenario single-scenario-missing-eval — Bug: Single Scenario section has no handling for missing eval.yaml"
+
+  - name: "review-history-multi-mode-most-recent"
+    description: "When log has both review and test entries, the most recent entry (regardless of mode) triggers the skip/re-review/cancel prompt"
+    category: regression
+    inputs:
+      command: "/skill-dev review commit"
+      state:
+        skill_exists: true
+        reviews_log: |
+          2026-03-27 | review | commit | PASS | 2 | Minor issues found
+          2026-03-29 | test --full | commit | PARTIAL | 8 | L2 3/4 PASS, L4 ambiguous
+        git_diff_empty: true
+        days_since_review: 1
+    assert:
+      - type: contains
+        value: "2026-03-29"
+      - type: contains-all
+        values:
+          - "Re-review"
+          - "Skip to testing"
+          - "Cancel"
+      - type: not-contains
+        value: "Running a fresh review"
+    source: "Exploratory test 2026-03-30, scenario review-history-multi-mode-entries — Ambiguity: spec says 'use the most recent one' without filtering by mode"
+
+  - name: "review-history-exact-7-day-boundary"
+    description: "Review exactly 7 days old does NOT trigger skip prompt — spec says < 7 days ago, and 7 is not < 7"
+    category: regression
+    inputs:
+      command: "/skill-dev review commit"
+      state:
+        skill_exists: true
+        reviews_log: "2026-03-23 | review | commit | PASS | 1 | Clean review"
+        git_diff_empty: true
+        days_since_review: 7
+        current_date: "2026-03-30"
+    assert:
+      - type: not-contains
+        value: "Re-review"
+      - type: not-contains
+        value: "Skip to testing"
+      - type: not-contains
+        value: "Cancel"
+      - type: contains-any
+        values:
+          - "Skill Review:"
+          - "validate-skill"
+          - "Running"
+          - "review"
+    source: "Exploratory test 2026-03-30, scenario review-history-exact-7-day-boundary — Ambiguity: prose 'last 7 calendar days' vs formal '< 7 days ago' disagree at boundary"
