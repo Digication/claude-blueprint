@@ -122,3 +122,17 @@ If Claude's style ever feels off — too detailed, not detailed enough, too caut
 
 Claude shows your current profile and lets you tweak it. You can also say `onboard me` anytime to redo the full setup.
 
+---
+
+## Going deeper
+
+Want to understand the full development workflow — how Claude manages branches, plans complex features, handles task switching, and tracks what's pending?
+
+See the **[Development Workflow Guide](docs/DEVELOPMENT_WORKFLOW.md)** for detailed walkthroughs with chat examples covering:
+
+- Building small fixes vs. large features
+- Switching between tasks without losing work
+- Picking up where you left off across chat sessions
+- Checking the status of all your in-progress work
+- How Claude decides whether to plan first or build directly
+

@@ -9,6 +9,16 @@ metadata:
 
 Build new apps, add features, or update existing code. Evaluates complexity to decide whether to create a phased plan or implement directly. Handles **planning**, **execution**, and **direct implementation**.
 
+## Relationship with Task
+
+This skill focuses on **building**. Workspace safety (dirty state, branching, stashing) is handled by the `task` skill. In the normal workflow:
+
+```
+task (workspace ready) → implement (evaluate → plan or build)
+```
+
+Implement assumes the workspace is in a safe state. It does NOT check for uncommitted changes or create branches — that's task's job. If implement detects uncommitted changes that are unrelated to the current work, it should note this and suggest the user handle it, but should not duplicate task's dirty-state workflow.
+
 ## Arguments
 
 - `plan <description>`: Create an implementation plan for a feature or project.
@@ -16,30 +26,6 @@ Build new apps, add features, or update existing code. Evaluates complexity to d
 - `resume <plan-path> <phase>`: Resume execution from a specific phase.
 - `<description>`: Evaluate complexity and either plan or implement directly.
 - (no args): Auto-detect — look for an existing plan to execute, or ask what to build.
-
-## Pre-check: Dirty State
-
-Before any mode (direct, plan, or execute), check for uncommitted work:
-
-1. Run `git status --porcelain`
-2. If clean — proceed to Complexity Evaluation
-3. If dirty — use **AskUserQuestion** to ask:
-
-**"You have uncommitted changes. What should we do with them before starting?"**
-Header: "Uncommitted Work"
-
-| Option | Description |
-|---|---|
-| Stash them | Save changes to git stash — you can get them back later |
-| Commit as WIP | Create a work-in-progress commit on the current branch |
-| They're related | Keep them — these changes are part of this work |
-| Discard them | Throw away uncommitted changes (cannot be undone) |
-
-Actions:
-- **Stash**: `git stash push -u -m "pre-implement: {brief_description}"`
-- **Commit as WIP**: Stage all and commit `wip: {current_branch_context}` — do NOT push
-- **Related**: Keep changes, proceed as-is
-- **Discard**: Confirm once more ("Are you sure? This cannot be undone."), then `git checkout -- . && git clean -fd`
 
 ---
 
@@ -73,11 +59,10 @@ Before starting, assess the scope to choose the right approach:
 
 For small-to-medium changes that don't warrant a full plan. Implement directly using standard tools.
 
-1. **Branch check**: If the user's purpose (from `.claude/user-context.md`) is Production, suggest creating a feature branch before making changes. Skip for Prototyping or Learning.
-2. Read relevant existing code to understand the codebase
-3. Implement the changes
-4. Run verification (typecheck, tests)
-5. Report what was done
+1. Read relevant existing code to understand the codebase
+2. Implement the changes
+3. Run verification (typecheck, tests)
+4. Report what was done
 
 ---
 
@@ -216,7 +201,13 @@ Run an existing implementation plan phase-by-phase using sub-agents.
 
 2. **Check current state.** Look at git log and existing files to determine which phases (if any) have already been completed. Resume from the first incomplete phase.
 
-3. **Execute phases sequentially** (or in parallel where the dependency graph allows):
+3. **Detect partial work.** Before re-running a phase, check whether untracked or modified files exist that match the phase's expected output (e.g., files listed in the phase doc's "Files to create/modify" section). If stale partial files are found from a previous failed attempt:
+   - Note the partial work to the user: "Phase {N} was attempted before and left partial files on disk."
+   - Ask whether to clean up first (remove the partial files) or proceed as-is (the sub-agent will overwrite them).
+   - If the user chooses cleanup: remove the partial files, then proceed.
+   - This prevents silent overwrites and avoids sub-agent confusion from pre-existing files.
+
+4. **Execute phases sequentially** (or in parallel where the dependency graph allows):
 
    For each phase:
    a. Spawn a sub-agent with the phase file as its prompt
@@ -225,9 +216,9 @@ Run an existing implementation plan phase-by-phase using sub-agents.
    d. If verification passed, commit with message `Phase N: <description>`
    e. If verification failed, attempt one fix cycle (diagnose the error, apply a fix, re-run verification). If still failing, stop and report the failing command, its output, and what was tried.
 
-4. **Handle parallel phases.** When the dependency graph shows independent phases, spawn them concurrently using `isolation: "worktree"`. After both complete, merge worktree changes before proceeding.
+5. **Handle parallel phases.** When the dependency graph shows independent phases, spawn them concurrently using `isolation: "worktree"`. After both complete, merge worktree changes before proceeding.
 
-5. **Final verification.** After all phases complete, run the full verification suite:
+6. **Final verification.** After all phases complete, run the full verification suite:
    a. Run typecheck, tests, and build
    b. **Start the app** — actually run it and confirm it starts without runtime errors (typecheck alone misses ESM issues, missing decorator metadata, missing runtime config, etc.)
    c. **Smoke test key flows** — if the app has a UI, open it and verify the main user journey works (e.g., register → login → create item → verify it appears). If it's an API, make a few curl/GraphQL requests. Only report completion after proving the app works end-to-end.

@@ -1,6 +1,6 @@
 skill: implement
 description: Golden dataset for implement skill — complexity evaluation, mode detection, and execution flows
-skill_hash: "0cef6a71790697064051da399e7caca0"
+skill_hash: "needs-regeneration"
 
 cases:
   - name: "simple-change-goes-direct"
@@ -50,20 +50,25 @@ cases:
           - "overview"
     source: "SKILL.md — user explicitly says plan overrides complexity"
 
-  - name: "dirty-state-precheck"
-    description: "Uncommitted changes detected before any mode starts"
-    category: boundary
+  - name: "dirty-state-delegates-to-task"
+    description: "Implement does NOT handle dirty state itself — delegates to task skill"
+    category: regression
     inputs:
       command: '/implement "Add dark mode"'
       state:
         git_status: "modified: src/theme.js"
     assert:
+      - type: not-contains
+        value: "Stash"
+      - type: not-contains
+        value: "Commit as WIP"
       - type: contains-any
         values:
           - "uncommitted"
           - "unsaved"
-          - "Stash"
-    source: "SKILL.md pre-check — dirty state handled before implementation"
+          - "handle"
+          - "task"
+    source: "SKILL.md — implement assumes workspace is safe, does not duplicate task's dirty-state workflow"
 
   - name: "medium-complexity-task-tracking"
     description: "4-10 file change routes to Direct + task tracking; skill must define what task tracking means"
@@ -139,12 +144,12 @@ cases:
           - "partial"
           - "stale"
           - "existing files"
-          - "Stash"
+          - "handle"
           - "clean"
       - type: decision-trace
         input: "resume phase 3 with partial work on disk"
-        rule: "Pre-check dirty state OR Execute Mode resume"
-        result: "Handle stale partial work before re-running phase"
+        rule: "Execute Mode resume — detect partial work"
+        result: "Note stale partial work and suggest handling before re-running phase"
     source: "Layer 4 exploratory 2026-03-30, scenario resume-from-phase"
 
   - name: "explicit-direct-overrides-complexity"

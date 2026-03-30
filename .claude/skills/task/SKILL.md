@@ -1,36 +1,89 @@
 ---
 name: task
-description: Manages task context switching safely — prevents losing uncommitted work when starting new tasks. Use when starting a new task, resuming previous work, or checking what's in progress.
+description: Manages workspace safety and context switching — saves uncommitted work, creates branches, shows project status dashboard, pauses/resumes work. The entry point before building anything. Use when starting a new task, resuming previous work, switching context, or checking what's in progress.
 metadata:
   allowed-tools: Bash, Read, Write, Edit, Glob, Grep, AskUserQuestion
 ---
 
-# Task — Safe Context Switching
+# Task — Workspace Safety & Context Switching
 
-Prevents lost work when switching between tasks across Claude Code sessions. Ensures uncommitted changes from a previous task are handled before starting something new.
+The workspace manager. Handles everything about **where you are** and **what's safe** before building starts. Prevents lost work when switching between tasks across Claude Code sessions.
+
+This skill is the **entry point** for the development workflow. It prepares the workspace, then hands off to `implement` for actual building.
+
+```
+User says what they want
+        │
+        ▼
+   ┌─────────┐
+   │  task    │  ← saves work, creates branch, restores context
+   └────┬────┘
+        │ workspace ready
+        ▼
+   ┌──────────┐
+   │ implement │  ← evaluates complexity, plans, builds
+   └──────────┘
+```
 
 ## Arguments
 
-- (no args) or `status`: Show current working state (branch, uncommitted changes, stashes)
-- `start "description"`: Start a new task — safely handles any dirty state first
+- (no args) or `status`: Show project status dashboard — all branches, plans, stashes, stale work
+- `start "description"`: Start a new task — safely handles dirty state, creates branch
 - `pause`: Save current work and return to a clean state
-- `resume`: List paused/in-progress tasks and switch to one
-- `list`: Show all task branches
+- `resume`: List available work and switch to it
+- `list`: Show all active branches
 
-## Workflow
+---
 
-### `status` (default)
+## `status` (default) — Project Dashboard
 
-1. Run `git status`, `git branch --show-current`, and `git stash list`
-2. Present a clear summary:
-   - Current branch
-   - Uncommitted changes (count of modified/staged/untracked files)
-   - Any stashed work (with descriptions)
-3. If there are uncommitted changes, note: "You have uncommitted work. Use `/task pause` to save it, or `/task start` to switch to something new."
+The dashboard reads git state on the spot — no tracking files, no database. Git is the single source of truth.
 
-### `start "description"`
+### Data gathering
 
-This is the core workflow — safe context switching.
+Run these commands to build the dashboard:
+
+```bash
+git branch --sort=-committerdate --format='%(refname:short)|%(committerdate:relative)|%(subject)'
+git stash list
+git log main --merges --oneline -10
+git status --porcelain
+git branch --show-current
+ls docs/implementation-plan/ 2>/dev/null
+```
+
+### Dashboard format
+
+Organize into sections:
+
+**IN PROGRESS** — branches with recent commits (within last 2 weeks), not merged to main:
+- Branch name, last activity date, last commit message
+- If a plan exists in `docs/implementation-plan/` matching the branch topic: show phase progress (e.g., "Plan: phase 3/5 complete")
+- Mark current branch with `← you are here`
+
+**STASHED WORK** — entries from `git stash list`:
+- Stash description and date
+- Parse branch name from stash message if available
+
+**POSSIBLY STALE** — branches with no commits in 2+ weeks, not merged:
+- Branch name, last activity date, commit count
+
+**RECENTLY COMPLETED** — branches merged to main in the last 2 weeks:
+- Branch name and merge date
+
+### Tier adaptation
+
+| Tier | Dashboard style |
+|---|---|
+| **Guided** | Plain language, no git terminology. "Here's what's going on with your project." |
+| **Supported** | Plain language with brief branch name references |
+| **Standard/Expert** | Compact table format with branch names and commands |
+
+If there are uncommitted changes on the current branch, note them at the top.
+
+---
+
+## `start "description"` — Begin New Work
 
 **Step 1 — Check dirty state**
 
@@ -43,52 +96,88 @@ Run `git status --porcelain`.
 
 **Step 2 — Handle uncommitted changes**
 
-Use **AskUserQuestion**:
+Adapt the prompt to the user's tier:
 
-**"You have uncommitted changes. What should we do with them?"**
-Header: "Uncommitted Work"
+**Guided tier:**
+
+Use **AskUserQuestion**:
+- **Question**: "You have unsaved work from before. Want me to save it so nothing gets lost?"
+- **Header**: "Unsaved Work"
+- **Options**: "Yes, save it" / "No, throw it away" / "Keep it — it's part of what I'm doing next"
+
+Actions:
+- **Yes, save it**: `git stash push -u -m "task: {current_branch} - {brief_description}"`
+- **No, throw it away**: Confirm once more ("Are you sure? This cannot be undone."), then `git checkout -- . && git clean -fd`
+- **Keep it**: Proceed to Step 3 with changes intact
+
+**Supported tier:** Same as Guided, but add a one-line summary of what the unsaved changes are (e.g., "3 files changed in the login component").
+
+**Standard / Expert tier:**
+
+Use **AskUserQuestion**:
+- **Question**: "You have uncommitted changes. What should we do with them?"
+- **Header**: "Uncommitted Work"
 
 | Option | Description |
 |---|---|
-| Stash them | Save changes to git stash — you can resume later with `/task resume` |
+| Stash them | Save changes to git stash — you can resume later |
 | Commit as WIP | Create a work-in-progress commit on the current branch |
 | They're related | Keep them — these changes are part of the new task |
 | Discard them | Throw away uncommitted changes (cannot be undone) |
 
 Actions:
-- **Stash**: Run `git stash push -m "task: {current_branch} - {brief_description}"` (include untracked with `-u`)
+- **Stash**: `git stash push -u -m "task: {current_branch} - {brief_description}"`
 - **Commit as WIP**: Stage all and commit with message `wip: {current_branch_context}` — do NOT push
-- **Related**: Keep changes, skip to Step 3 (stay on current branch or carry changes to new branch)
-- **Discard**: Confirm once more ("Are you sure? This cannot be undone."), then `git checkout -- . && git clean -fd`
+- **Related**: Keep changes, proceed to Step 3
+- **Discard**: Confirm once more, then `git checkout -- . && git clean -fd`
 
-**Step 3 — Create task branch**
+**Step 3 — Create branch**
 
-1. Derive a branch name from the description: `task/{short-kebab-case}` (e.g., `task/add-login-page`)
-2. Use **AskUserQuestion** to confirm:
+Derive a branch name from the description using conventional prefixes:
 
-**"Start task on a new branch?"**
-Header: "New Task"
+| Description contains | Prefix | Example |
+|---|---|---|
+| "fix", "bug", "broken", "issue", "error" | `fix/` | `fix/login-blank-screen` |
+| "refactor", "clean up", "reorganize" | `refactor/` | `refactor/auth-middleware` |
+| Everything else (features, new work) | `feat/` | `feat/user-dashboard` |
+
+Use **AskUserQuestion** to confirm:
+
+- **Question**: "Start on a new branch?"
+- **Header**: "New Branch"
 
 | Option | Description |
 |---|---|
-| Create branch `task/{name}` | Branch from current HEAD |
-| Create branch from main | Start fresh from main branch |
-| Stay on current branch | No branch — just start working here |
+| Create `{prefix}/{name}` | Branch from current HEAD |
+| Create from main | Start fresh from main branch |
+| Stay on current branch | No branch — just work here |
 
-3. Create the branch if requested: `git checkout -b task/{name}` (or `git checkout -b task/{name} main`)
-4. Confirm based on the choice:
-   - If branch created: "Ready to go. You're on `task/{name}`. What are we building?"
-   - If staying on current branch: "Ready to go. You're on `{current_branch}`. What are we building?"
+Create the branch if requested: `git checkout -b {prefix}/{name}` (or `git checkout -b {prefix}/{name} main`)
 
-### `pause`
+**Step 4 — Hand off**
+
+The workspace is now ready. Proceed with the user's original request. If the user described something to build, the conversation continues into `implement` (complexity evaluation → plan or direct build). Task does not call implement directly — the contextual routing in CLAUDE.md handles the transition.
+
+Confirm based on tier:
+- **Guided/Supported**: "All set. Let's get started."
+- **Standard/Expert**: "On `{branch}`. Ready to build."
+
+---
+
+## `pause` — Save Work
 
 Save current work and return to a clean state.
 
-1. Check `git status --porcelain` — if clean, say "Nothing to pause — working tree is clean."
+1. Check `git status --porcelain` — if clean, say "Nothing to save — working tree is clean."
 2. If dirty, use **AskUserQuestion**:
 
-**"How should we save your current work?"**
-Header: "Pause Task"
+**Guided tier:**
+- **Question**: "Want me to save your current work?"
+- **Options**: "Yes" / "No, I'll come back to it" (explain that "saving" means git will remember it)
+
+**Standard/Expert tier:**
+- **Question**: "How should we save your current work?"
+- **Header**: "Pause Task"
 
 | Option | Description |
 |---|---|
@@ -96,71 +185,83 @@ Header: "Pause Task"
 | Commit as WIP | Create a WIP commit on this branch |
 
 3. Execute the chosen action:
-   - **Stash**: `git stash push -u -m "task: {branch} - paused"`
-   - **WIP commit**: Stage all, commit `wip: {brief_context_from_recent_changes}`
-4. **Save task context to auto memory** so the next conversation knows what was in progress:
-   - Determine the memory directory: `~/.claude/projects/<project-slug>/memory/` where `<project-slug>` is the git repo's absolute path with `/` replaced by `-` (e.g., `/Volumes/Data/myapp` → `-Volumes-Data-myapp`)
-   - Create the directory if it doesn't exist
-   - Write the memory file to `<memory-dir>/task_{branch_name}.md`:
-     ```markdown
-     ---
-     name: task_{branch_name}
-     description: Paused task on {branch} — {brief description of what was being worked on}
-     type: project
-     ---
+   - **Stash**: `git stash push -u -m "task: {branch} - {brief_context}"`
+   - **WIP commit**: Stage all, commit `wip: {brief_context_from_recent_changes}` — do NOT push
 
-     Task paused on `{branch}` ({date}).
-     **What was in progress:** {summary of changes from git diff/status}
-     **Next steps:** {what remains to be done, if known}
-     **Why paused:** {reason, if given}
-     ```
-   - Add a pointer to `<memory-dir>/MEMORY.md` (create if it doesn't exist)
-   - If the task is later resumed and completed, remove this memory file and its MEMORY.md entry (no longer needed)
+4. Stash messages must carry enough context to be useful later. Include:
+   - Branch name
+   - Brief description of what was being worked on
+   - If an implementation plan exists, note the current phase
+
 5. Optionally ask if they want to switch to main: "Switch back to main branch?"
-6. Confirm: "Work saved. Use `/task resume` to pick up where you left off."
+6. Confirm: "Work saved. When you're ready to come back, just say 'resume' or 'go back to {topic}'."
 
-### `resume`
+---
 
-List available tasks and switch to one.
+## `resume` — Restore Previous Work
 
-1. Gather task branches: `git branch --list 'task/*'`
+List available work and switch to it.
+
+1. Gather ALL feature/fix/refactor branches (not just a single prefix):
+   ```bash
+   git branch --sort=-committerdate --format='%(refname:short)|%(committerdate:relative)|%(subject)'
+   ```
 2. Gather stashes: `git stash list`
-3. If nothing found: "No paused tasks found. Use `/task start` to begin something new."
+3. If nothing found: "No paused work found. What would you like to build?"
 4. Present combined list with **AskUserQuestion**:
 
-**"Which task do you want to resume?"**
-Header: "Resume Task"
+- **Question**: "Which work do you want to continue?"
+- **Header**: "Resume Work"
 
 Options built from:
-- Task branches (with last commit message as description)
-- Stash entries (with stash message as description)
+- Active branches (with last commit message and date)
+- Stash entries (with stash message and date)
 
-5. Resume the selected task:
-   - **If user picked a branch**: `git checkout task/{name}`. If a stash exists with a matching `task: task/{name}` prefix, ask if they want to pop it too.
-   - **If user picked a stash**: Parse the originating branch from the stash message (the `task: {branch}` prefix). Checkout that branch first (`git checkout {branch}`), THEN pop the stash (`git stash pop`). Both steps are required — never pop a stash without first being on the correct branch.
+5. Resume the selected work:
+   - **Branch selected**: `git checkout {branch}`. If a stash exists with a matching branch name in the message prefix, ask if they want to restore it too.
+   - **Stash selected**: Parse the originating branch from the stash message (the `task: {branch}` prefix). Checkout that branch first, THEN pop the stash. Both steps are required — never pop a stash without first being on the correct branch.
+
 6. Run `git status` and show current state
-7. **Check auto memory** at `~/.claude/projects/<project-slug>/memory/task_{branch_name}.md` — if found, include the saved context (what was in progress, next steps) in the summary. Then remove the memory file and its MEMORY.md entry since the task is active again.
-8. Confirm: "Resumed `task/{name}`. Here's where you left off: [brief state summary including memory context if available]"
 
-### `list`
+7. **Detect implementation plans**: Check `docs/implementation-plan/` for a plan matching the branch topic. If found:
+   - Check git log for phase commits to determine progress
+   - Report: "You have an implementation plan for this — phase {N} of {total} is next."
+   - For Guided/Supported: "There's a step-by-step plan for this work. Want me to continue building where we left off?"
+   - For Standard/Expert: "Plan found at `docs/implementation-plan/{name}/`. Phase {N}/{total} next. Continue execution?"
 
-1. Show all `task/*` branches with their last commit message and date
-2. Show any stashes with `task:` prefix
-3. Highlight current branch if it's a task branch
-4. If no tasks: "No task branches found."
+8. Confirm: "Resumed. Here's where you left off: [brief state summary]"
+
+---
+
+## `list` — Show All Active Work
+
+1. Show ALL non-main branches sorted by recent activity:
+   ```bash
+   git branch --sort=-committerdate --format='%(refname:short)|%(committerdate:relative)|%(subject)'
+   ```
+2. Show any stashes
+3. For each branch, check if a matching implementation plan exists and note progress
+4. Highlight current branch
+5. If no branches besides main: "No active work found."
+
+---
 
 ## Branch Naming
 
-- Prefix: `task/`
+- Use conventional prefixes: `feat/`, `fix/`, `refactor/`
 - Format: kebab-case, derived from description
 - Max length: 50 chars for the suffix
-- Examples: `task/add-login-page`, `task/fix-nav-bug`, `task/refactor-auth`
+- Examples: `feat/user-dashboard`, `fix/login-blank-screen`, `refactor/auth-middleware`
+
+---
 
 ## Rules
 
 - **Never discard changes without explicit double-confirmation** — this is the skill's #1 safety guarantee
 - **Always show what will be affected** before stashing, committing, or discarding
-- **Stash messages must be descriptive** — include branch name and context so `/task resume` is useful
+- **Stash messages must be descriptive** — include branch name and context so resume is useful
 - **Don't force branch creation** — some tasks are fine on the current branch
 - **WIP commits should never be pushed** — they're local-only placeholders
-- **Use the user's tier language** — if their profile is Guided, explain git concepts; if Expert, be terse
+- **Git is the database** — do not write tracking files, memory files, or any persistent store for task state. All context comes from git: branch names, commit messages, stash messages, and plan docs in the repo.
+- **Use the user's tier language** — Guided: plain language, explain git concepts. Expert: terse, use git terminology.
+- **Scan all branches** — don't limit to a single prefix. Users may have branches from other tools, manual creation, or GitHub.

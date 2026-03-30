@@ -1,10 +1,10 @@
 skill: task
-description: Golden dataset for task skill — context switching and dirty state handling
-skill_hash: "737767bc9c5c693c61a001ea25745b8f"
+description: Golden dataset for task skill — workspace safety, context switching, and project dashboard
+skill_hash: "needs-regeneration"
 
 cases:
   - name: "start-clean-tree-creates-branch"
-    description: "Starting a task on a clean tree creates a task branch without dirty-state prompt"
+    description: "Starting a task on a clean tree creates a conventional branch without dirty-state prompt"
     category: happy-path
     inputs:
       command: '/task start "Add login page"'
@@ -15,17 +15,50 @@ cases:
         value: "uncommitted"
       - type: contains-any
         values:
-          - "task/add-login-page"
+          - "feat/add-login-page"
           - "branch"
-    source: "SKILL.md start workflow — clean tree skips Step 2"
+    source: "SKILL.md start workflow — clean tree skips Step 2, uses feat/ prefix"
 
-  - name: "start-dirty-tree-asks-options"
-    description: "Starting a task with uncommitted changes presents 4 options"
+  - name: "start-fix-uses-fix-prefix"
+    description: "Starting a task with 'fix' or 'bug' in description uses fix/ branch prefix"
+    category: happy-path
+    inputs:
+      command: '/task start "Fix login blank screen bug"'
+      state:
+        git_status: "clean"
+    assert:
+      - type: contains-any
+        values:
+          - "fix/"
+          - "fix/login"
+    source: "SKILL.md Step 3 — branch prefix table: fix/bug/broken/error → fix/"
+
+  - name: "start-dirty-tree-guided-simplified"
+    description: "Guided tier sees simplified yes/no prompt for dirty state, not 4 technical options"
+    category: boundary
+    inputs:
+      command: '/task start "Add dashboard"'
+      state:
+        git_status: "modified: src/app.js"
+        user_tier: "guided"
+    assert:
+      - type: contains-any
+        values:
+          - "unsaved work"
+          - "save it"
+          - "nothing gets lost"
+      - type: not-contains
+        value: "Stash"
+    source: "SKILL.md Step 2 — Guided tier gets simplified prompt"
+
+  - name: "start-dirty-tree-expert-full-options"
+    description: "Standard/Expert tier sees full 4-option dirty state prompt"
     category: boundary
     inputs:
       command: '/task start "Fix auth bug"'
       state:
         git_status: "modified: src/auth.js"
+        user_tier: "standard"
     assert:
       - type: contains-all
         values:
@@ -33,7 +66,7 @@ cases:
           - "Commit"
           - "Related"
           - "Discard"
-    source: "SKILL.md Step 2 — 4 options for uncommitted changes"
+    source: "SKILL.md Step 2 — Standard/Expert tier gets 4 options"
 
   - name: "discard-requires-double-confirm"
     description: "Discard option requires a second confirmation before destroying changes"
@@ -51,35 +84,72 @@ cases:
           - "confirm"
     source: "SKILL.md Step 2 — double-confirm safety gate for discard"
 
-  - name: "status-no-args-shows-state"
-    description: "Running task with no args shows current working state"
+  - name: "status-shows-dashboard"
+    description: "Running task with no args shows project dashboard with branches, stashes, plans"
     category: happy-path
     inputs:
       command: "/task"
       state:
         git_status: "clean"
         current_branch: "main"
+        branches: ["feat/user-dashboard", "fix/login-bug"]
     assert:
       - type: contains-any
         values:
-          - "main"
-          - "branch"
-          - "status"
-          - "working"
-    source: "SKILL.md — no args or status shows current state"
+          - "IN PROGRESS"
+          - "dashboard"
+          - "feat/user-dashboard"
+          - "branches"
+          - "project"
+    source: "SKILL.md status — project dashboard reads git state"
 
-  - name: "resume-no-tasks-found"
-    description: "Resume with no task branches or stashes reports nothing to resume"
+  - name: "resume-detects-implementation-plan"
+    description: "Resuming a branch with an implementation plan reports plan progress"
+    category: happy-path
+    inputs:
+      command: "/task resume"
+      state:
+        branches: ["feat/user-dashboard"]
+        stash_list: []
+        plan_exists: "docs/implementation-plan/user-dashboard/"
+        completed_phases: ["01-setup", "02-schema"]
+        total_phases: 5
+    assert:
+      - type: contains-any
+        values:
+          - "plan"
+          - "phase"
+          - "implementation"
+    source: "SKILL.md resume step 7 — detect implementation plans"
+
+  - name: "resume-no-work-found"
+    description: "Resume with no branches or stashes reports nothing to resume"
     category: boundary
     inputs:
       command: "/task resume"
       state:
-        task_branches: []
+        branches: ["main"]
         stash_list: []
     assert:
       - type: contains-any
         values:
-          - "No paused tasks"
-          - "no tasks"
+          - "No paused work"
+          - "no work"
           - "nothing to resume"
+          - "What would you like to build"
     source: "SKILL.md resume workflow — empty state edge case"
+
+  - name: "no-tracking-files-written"
+    description: "Task never writes memory files, JSON tracking, or any persistent store — git is the database"
+    category: regression
+    inputs:
+      command: '/task pause'
+      state:
+        git_status: "modified: src/app.js"
+        user_choice: "Stash"
+    assert:
+      - type: not-contains
+        value: "memory"
+      - type: not-contains
+        value: "task_"
+    source: "SKILL.md rules — git is the database, no tracking files"
