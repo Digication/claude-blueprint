@@ -1,0 +1,17 @@
+{
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true,
+    "filesystem": {
+      "allowWrite": [
+        "~/.claude/projects"
+      ]
+    },
+    "allowedDomains": [
+      "mcp.slack.com",
+      "github.com",
+      "api.github.com"
+    ],
+    "allowUnsandboxedCommands": true
+  }
+}
