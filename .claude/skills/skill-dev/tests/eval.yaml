@@ -3,7 +3,7 @@ description: Golden dataset for skill-dev — regression tests from dry-run test
 # skill_hash = MD5 of ALL files in the skill directory (excluding tests/ and .plugin-data/).
 # Do NOT hash just SKILL.md. Compute with: node scripts/run-eval.mjs --rehash
 # Or replicate the logic in scripts/run-eval.mjs → computeSkillHash()
-skill_hash: "f2d8628994c0f753926b5f2bb4aba6c0"
+skill_hash: "7ebca2c18e6c24eee05115b7f4055594"
 
 cases:
   - name: "invalid-skill-shows-error"
@@ -336,3 +336,84 @@ cases:
           - "Running"
           - "review"
     source: "Exploratory test 2026-03-30, scenario review-history-exact-7-day-boundary — Ambiguity: prose 'last 7 calendar days' vs formal '< 7 days ago' disagree at boundary"
+
+  - name: "test-findings-suggest-retrospective"
+    description: "When test mode finds Bug or Ambiguity issues, suggest retrospective"
+    category: happy-path
+    inputs:
+      command: "/skill-dev test fake-skill"
+      state:
+        skill_exists: true
+        skill_path: .claude/skills/skill-dev/tests/fixtures/fake-skill
+        expected_findings:
+          - type: Bug
+            description: "Bare Bash in allowed-tools not flagged"
+    assert:
+      - type: contains-any
+        values:
+          - "/retrospective"
+          - "retrospective"
+          - "capture"
+          - "learning"
+    source: "Phase 4 — test findings suggest retrospective"
+
+  - name: "baseline-mode-runs-comparison"
+    description: "Baseline mode produces a with/without skill comparison report"
+    category: happy-path
+    inputs:
+      command: "/skill-dev baseline fake-skill"
+      state:
+        skill_exists: true
+        skill_path: .claude/skills/skill-dev/tests/fixtures/fake-skill
+    assert:
+      - type: contains-all
+        values:
+          - "With Skill"
+          - "Without Skill"
+      - type: contains-any
+        values:
+          - "Delta"
+          - "Impact"
+          - "Helps"
+          - "Neutral"
+          - "Hurts"
+    source: "Phase 5 — baseline comparison mode"
+
+  - name: "triggers-mode-generates-query-set"
+    description: "Triggers mode creates should/should-not trigger queries and scores them"
+    category: happy-path
+    inputs:
+      command: "/skill-dev triggers fake-skill --dry-run"
+      state:
+        skill_exists: true
+        skill_path: .claude/skills/skill-dev/tests/fixtures/fake-skill
+    assert:
+      - type: contains-all
+        values:
+          - "should trigger"
+          - "should not"
+      - type: contains-any
+        values:
+          - "precision"
+          - "recall"
+          - "F1"
+          - "accuracy"
+    source: "Phase 6 — trigger optimization mode"
+
+  - name: "test-mode-offers-html-viewer"
+    description: "After test run completes, skill offers to open HTML viewer"
+    category: happy-path
+    inputs:
+      command: "/skill-dev test fake-skill"
+      state:
+        skill_exists: true
+        skill_path: .claude/skills/skill-dev/tests/fixtures/fake-skill
+    assert:
+      - type: contains-any
+        values:
+          - "HTML"
+          - "viewer"
+          - "browser"
+          - "open"
+          - "generate-viewer"
+    source: "Phase 7 — browser viewer after test"

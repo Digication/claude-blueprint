@@ -2,7 +2,7 @@
 name: retrospective
 description: Captures learnings from the current conversation — skill corrections, user preferences, or new skill opportunities. Use when the user corrects your approach, says "remember this", asks to save a preference, reflects on what worked, or after completing significant work. Also auto-triggered by Contextual Skill Routing when corrections or successful non-obvious workflows are detected.
 metadata:
-  allowed-tools: Read, Glob, Grep, Edit, Write
+  allowed-tools: Read, Glob, Grep, Edit, Write, Bash(node .claude/skills/skill-dev/scripts/validate-skill.mjs:*)
 ---
 
 ## Skill Resources
@@ -22,6 +22,7 @@ Review the current conversation for potential workflow improvements.
 
 1. **Skill corrections** - A skill was used but needed adjustment
    -> Follow [SKILL_IMPROVEMENT](references/SKILL_IMPROVEMENT.md)
+   -> If the correction is also cross-cutting, apply both routes (see "Dual-Route Learnings" in SKILL_IMPROVEMENT)
 
 2. **General preferences** - User expressed cross-cutting team standards
    -> Follow [GENERAL_IMPROVEMENT](references/GENERAL_IMPROVEMENT.md)
@@ -31,6 +32,44 @@ Review the current conversation for potential workflow improvements.
 
 4. **New skill opportunity** - No skill existed but approach worked well
    -> Follow [SKILL_CREATION](references/SKILL_CREATION.md)
+
+## Multiple Learnings
+
+When a conversation contains more than one learning:
+
+1. Identify **all** learnings before proposing any
+2. Present them as a numbered list with the routing destination for each
+3. Ask for approval on the full set before applying any
+
+**Template:**
+
+```markdown
+I found [N] learnings from this conversation:
+
+1. **[Title]** → [destination: `/[skill]` skill / `CLAUDE.md` / memory]
+   [one-line description]
+
+2. **[Title]** → [destination]
+   [one-line description]
+
+Want me to apply all of these, or go through them one by one?
+```
+
+Process each learning independently through its routing path after approval.
+
+## Nothing Found
+
+When no learnings are detected after reviewing the conversation, say:
+
+```markdown
+I reviewed our conversation but didn't find any learnings to capture — no corrections,
+preferences, new patterns, or skill opportunities. This is normal for straightforward tasks.
+```
+
+Do NOT:
+- Suggest edits to skills, CLAUDE.md, or memory files
+- Propose vague "improvements" just to have something to show
+- Fabricate learnings that aren't supported by the conversation
 
 ## Examples
 

@@ -5,6 +5,7 @@
 - If `git status` shows uncommitted changes at conversation start: handle based on tier (see Contextual Skill Routing) — never assume the user knows what "uncommitted changes" means
 - Commit messages: Conventional Commits format (`feat(scope): description`)
 - Skill quality pipeline (for skill authors): `/skill-dev review` → `/skill-dev test` → `/skill-dev integration plan` → fix → ship
+- Skill feedback loop: use `/retrospective` after any skill correction → it edits the skill and validates → suggest `/skill-dev test` to verify → findings from testing feed back into `/retrospective`
 
 # CLAUDE.md File Roles
 - Root `CLAUDE.md` → **environment facts**: commands, dev setup, how to run things

@@ -39,8 +39,11 @@ I'll add this to the project CLAUDE.md. Proceed?
 ## Save Process
 
 1. Check if `CLAUDE.md` exists at the project root
-2. If not, create it with a `# Claude Instructions` header
-3. Propose the addition with section, content, and reason
+2. **Search for duplicates** — before proposing, scan existing `CLAUDE.md` content for:
+   - **Exact match**: same rule already stated → inform user ("This is already in CLAUDE.md: [quote]") and skip
+   - **Semantic match**: same intent, different wording → inform user and skip (or offer to consolidate)
+   - **Contradiction**: opposite instruction exists → surface both versions, ask which to keep
+3. If not found (and no contradiction), propose the addition with section, content, and reason
 4. Ask for approval before applying
 
 ### Example Project CLAUDE.md Structure

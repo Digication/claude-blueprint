@@ -26,6 +26,28 @@ For cross-cutting preferences -> See [GENERAL_IMPROVEMENT](GENERAL_IMPROVEMENT.m
 | Is it skill-specific?             | -> [GENERAL_IMPROVEMENT](GENERAL_IMPROVEMENT.md) |
 | Is it general? (helps most users) | -> [GENERAL_IMPROVEMENT](GENERAL_IMPROVEMENT.md) |
 
+## Dual-Route Learnings
+
+When a correction applies to **one specific skill** AND reflects a **general principle** that should guide all future work, do both routes:
+
+1. **GENERAL_IMPROVEMENT** — add the general rule to `CLAUDE.md` so it applies everywhere
+2. **SKILL_IMPROVEMENT** — add a skill-specific implementation note to the triggering skill
+
+**Example:** "Always run tests before committing" (triggered after the commit skill committed without running tests)
+- CLAUDE.md gets: "Run tests before committing code changes."
+- commit SKILL.md gets: a specific step to check test results before creating the commit
+
+**Dual-route proposal template:**
+
+```markdown
+I found a learning that applies both specifically to the `/[skill]` skill and more broadly:
+
+**General rule** → `CLAUDE.md`: [description of general principle]
+**Skill-specific** → `/[skill]` skill: [description of implementation detail]
+
+Want me to apply both?
+```
+
 ## How to Propose
 
 ```markdown
@@ -41,6 +63,14 @@ Should I update the skill?
 1. Locate skill files in `.claude/skills/[skill-name]/`
 2. Propose the specific edit with file, section, change, and reason
 3. Ask for approval before applying
+4. Apply the edit
+5. **Validate the result:**
+   ```bash
+   node .claude/skills/skill-dev/scripts/validate-skill.mjs .claude/skills/[skill-name]/
+   ```
+   - If validation **passes**: proceed to step 6
+   - If validation **fails**: report the errors, fix them immediately (don't leave the skill broken), re-validate
+6. **Suggest follow-up:** "Edit applied and validated. Want me to run `/skill-dev test [skill-name]` to verify the change works as expected?"
 
 ### Where Changes Go
 

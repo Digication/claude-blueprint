@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>skill-dev Eval Viewer — __SKILL_NAME__</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #1a1a1a; }
+  header { background: #1a1a2e; color: white; padding: 16px 24px; display: flex; align-items: center; gap: 16px; }
+  header h1 { font-size: 18px; font-weight: 600; }
+  header .pill { background: rgba(255,255,255,0.15); padding: 4px 10px; border-radius: 12px; font-size: 13px; }
+  .tabs { display: flex; background: white; border-bottom: 1px solid #e0e0e0; padding: 0 24px; }
+  .tab { padding: 12px 16px; font-size: 14px; cursor: pointer; border-bottom: 2px solid transparent; color: #666; }
+  .tab.active { border-bottom-color: #1a1a2e; color: #1a1a1a; font-weight: 500; }
+  .pane { display: none; padding: 24px; }
+  .pane.active { display: block; }
+  .case-card { background: white; border: 1px solid #e0e0e0; border-radius: 8px; margin-bottom: 12px; overflow: hidden; }
+  .case-header { padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
+  .case-header:hover { background: #fafafa; }
+  .case-name { font-size: 14px; font-weight: 500; }
+  .case-category { font-size: 12px; color: #888; margin-left: 8px; }
+  .badge { padding: 3px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; }
+  .badge.pass { background: #d4edda; color: #155724; }
+  .badge.fail { background: #f8d7da; color: #721c24; }
+  .badge.partial { background: #fff3cd; color: #856404; }
+  .case-body { display: none; padding: 16px; border-top: 1px solid #e0e0e0; }
+  .case-body.open { display: block; }
+  .section-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-bottom: 8px; }
+  .output-block { background: #f8f8f8; border: 1px solid #e8e8e8; border-radius: 4px; padding: 12px; font-size: 13px; font-family: monospace; white-space: pre-wrap; max-height: 400px; overflow-y: auto; margin-bottom: 16px; }
+  .assertions-table { width: 100%; font-size: 13px; border-collapse: collapse; margin-bottom: 16px; }
+  .assertions-table th { text-align: left; padding: 6px 8px; background: #f0f0f0; font-weight: 500; }
+  .assertions-table td { padding: 6px 8px; border-top: 1px solid #eee; vertical-align: top; }
+  .check { color: #28a745; } .cross { color: #dc3545; }
+  .feedback-box { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; font-family: inherit; resize: vertical; min-height: 80px; }
+  .benchmark-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .benchmark-table th { background: #1a1a2e; color: white; padding: 10px 12px; text-align: left; }
+  .benchmark-table td { padding: 10px 12px; border-bottom: 1px solid #eee; }
+  .benchmark-table tr:hover td { background: #fafafa; }
+  .summary-bar { display: flex; gap: 24px; background: white; padding: 16px 24px; border-bottom: 1px solid #e0e0e0; }
+  .stat { display: flex; flex-direction: column; }
+  .stat-value { font-size: 24px; font-weight: 700; }
+  .stat-label { font-size: 12px; color: #888; }
+  .export-btn { background: #1a1a2e; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; float: right; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>skill-dev Eval Viewer</h1>
+  <span class="pill">__SKILL_NAME__</span>
+  <span class="pill">__TIMESTAMP__</span>
+</header>
+
+<div class="summary-bar" id="summary-bar"></div>
+
+<div class="tabs">
+  <div class="tab active" onclick="showPane('results')">Results</div>
+  <div class="tab" onclick="showPane('benchmark')">Benchmark</div>
+</div>
+
+<div id="pane-results" class="pane active">
+  <button class="export-btn" onclick="exportFeedback()">Export Feedback</button>
+  <div id="cases-container"></div>
+</div>
+
+<div id="pane-benchmark" class="pane">
+  <div id="benchmark-container"></div>
+</div>
+
+<script>
+/*__EMBEDDED_DATA__*/
+
+function showPane(name) {
+  document.querySelectorAll('.pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('pane-' + name).classList.add('active');
+  event.target.classList.add('active');
+}
+
+function toggle(id) {
+  const el = document.getElementById(id);
+  el.classList.toggle('open');
+}
+
+function saveFeedback(caseId) {
+  const val = document.getElementById('fb-' + caseId).value;
+  const stored = JSON.parse(localStorage.getItem('eval-feedback') || '{}');
+  stored[caseId] = val;
+  localStorage.setItem('eval-feedback', JSON.stringify(stored));
+}
+
+function exportFeedback() {
+  const stored = JSON.parse(localStorage.getItem('eval-feedback') || '{}');
+  const blob = new Blob([JSON.stringify({ reviews: stored, exported: new Date().toISOString() }, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'feedback.json'; a.click();
+}
+
+function renderCases() {
+  const stored = JSON.parse(localStorage.getItem('eval-feedback') || '{}');
+  const container = document.getElementById('cases-container');
+  let pass = 0, fail = 0, partial = 0;
+
+  container.innerHTML = DATA.cases.map((c, i) => {
+    const verdict = c.verdict || 'unknown';
+    if (verdict === 'PASS') pass++; else if (verdict === 'FAIL') fail++; else partial++;
+    const badgeClass = verdict === 'PASS' ? 'pass' : verdict === 'FAIL' ? 'fail' : 'partial';
+    const assertions = (c.assertions || []).map(a =>
+      `<tr><td>${a.passed ? '<span class="check">✓</span>' : '<span class="cross">✗</span>'}</td><td>${a.type || ''}</td><td style="color:#555">${(a.evidence || '').slice(0, 120)}</td></tr>`
+    ).join('');
+    const feedback = stored[c.name] || '';
+    return `
+      <div class="case-card">
+        <div class="case-header" onclick="toggle('body-${i}')">
+          <span><span class="case-name">${c.name}</span><span class="case-category">${c.category || ''}</span></span>
+          <span class="badge ${badgeClass}">${verdict}</span>
+        </div>
+        <div class="case-body" id="body-${i}">
+          <div class="section-label">Output</div>
+          <div class="output-block">${(c.output || '').replace(/</g,'&lt;')}</div>
+          ${assertions ? `<div class="section-label">Assertions</div><table class="assertions-table"><thead><tr><th></th><th>Type</th><th>Evidence</th></tr></thead><tbody>${assertions}</tbody></table>` : ''}
+          <div class="section-label">Feedback</div>
+          <textarea class="feedback-box" id="fb-${c.name}" oninput="saveFeedback('${c.name}')">${feedback}</textarea>
+        </div>
+      </div>`;
+  }).join('');
+
+  document.getElementById('summary-bar').innerHTML = `
+    <div class="stat"><span class="stat-value" style="color:#28a745">${pass}</span><span class="stat-label">Passed</span></div>
+    <div class="stat"><span class="stat-value" style="color:#dc3545">${fail}</span><span class="stat-label">Failed</span></div>
+    <div class="stat"><span class="stat-value" style="color:#ffc107">${partial}</span><span class="stat-label">Partial</span></div>
+    <div class="stat"><span class="stat-value">${DATA.cases.length}</span><span class="stat-label">Total</span></div>
+  `;
+}
+
+function renderBenchmark() {
+  const container = document.getElementById('benchmark-container');
+  if (!DATA.benchmark) { container.innerHTML = '<p style="color:#888;padding:24px">No benchmark data available. Run baseline comparison first.</p>'; return; }
+  container.innerHTML = '<table class="benchmark-table"><thead><tr><th>Configuration</th><th>Pass Rate</th><th>Delta</th></tr></thead><tbody>' +
+    DATA.benchmark.map(b => `<tr><td>${b.config}</td><td>${Math.round(b.pass_rate * 100)}%</td><td>${b.delta >= 0 ? '+' : ''}${Math.round(b.delta * 100)}%</td></tr>`).join('') +
+    '</tbody></table>';
+}
+
+renderCases();
+renderBenchmark();
+</script>
+</body>
+</html>

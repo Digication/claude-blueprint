@@ -1,6 +1,6 @@
 skill: retrospective
 description: Golden dataset for retrospective skill — learning routing
-skill_hash: "02423d59b1ef54fb23c0890f2f4c616d"
+skill_hash: "cf676a97528fb6d5ac76a31ae7764a36"
 
 cases:
   # --- Existing cases (assertions fixed) ---
@@ -185,3 +185,73 @@ cases:
       - type: llm-rubric
         value: "The output clearly communicates that no learnings were found, in a friendly and non-technical way. It should not suggest changes or propose edits to any files."
     source: "Exploratory test 2026-03-30 — finding 7: no 'nothing found' output template in skill"
+
+  - name: "skill-creation-captures-intent"
+    description: "New skill creation should ask intent questions before drafting"
+    category: happy-path
+    inputs:
+      command: "/retrospective"
+      state:
+        conversation_context: |
+          User asked Claude to batch-rename files using a regex pattern. Claude wrote
+          a script on the fly, ran it, it worked perfectly. User said "That was great,
+          can we save that?" No existing skill covers batch file operations.
+    assert:
+      - type: contains-any
+        values:
+          - "SKILL_CREATION"
+          - "new skill"
+          - "Save as a new skill"
+      - type: contains-any
+        values:
+          - "trigger"
+          - "when would"
+          - "what phrases"
+          - "inputs"
+          - "outputs"
+    source: "Phase 2 — skill creation intent capture"
+
+  - name: "skill-edit-suggests-validation"
+    description: "After editing a skill, retrospective suggests running skill-dev test"
+    category: happy-path
+    inputs:
+      command: "/retrospective"
+      state:
+        conversation_context: |
+          User corrected the commit skill: it added emojis to commit messages,
+          user said "No emojis in commit messages please". The correction was applied
+          to .claude/skills/commit/SKILL.md.
+        edit_was_applied: true
+    assert:
+      - type: contains-any
+        values:
+          - "validate"
+          - "validation"
+          - "validate-skill"
+      - type: contains-any
+        values:
+          - "/skill-dev"
+          - "skill-dev test"
+          - "test the skill"
+          - "verify"
+    source: "Phase 3 — post-edit validation suggestion"
+
+  - name: "loop-is-bidirectional"
+    description: "retrospective after a skill edit mentions skill-dev for verification"
+    category: regression
+    inputs:
+      command: "/retrospective"
+      state:
+        conversation_context: |
+          skill-dev found a Bug in the commit skill: it doesn't ask for scope before
+          creating a commit. The finding was reviewed and the fix was applied to
+          .claude/skills/commit/SKILL.md.
+        edit_was_applied: true
+    assert:
+      - type: contains-any
+        values:
+          - "skill-dev"
+          - "/skill-dev test"
+          - "test"
+          - "verify"
+    source: "Phase 4 — loop is bidirectional (skill-dev → retrospective → skill-dev)"

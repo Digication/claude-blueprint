@@ -2,6 +2,7 @@
   "sandbox": {
     "enabled": true,
     "autoAllowBashIfSandboxed": true,
+    "allowUnsandboxedCommands": true,
     "filesystem": {
       "allowWrite": [
         "~/.claude/projects"
@@ -11,7 +12,9 @@
       "mcp.slack.com",
       "github.com",
       "api.github.com"
-    ],
-    "allowUnsandboxedCommands": true
+    ]
+  },
+  "enabledPlugins": {
+    "skill-creator@claude-plugins-official": true
   }
 }

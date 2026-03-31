@@ -34,6 +34,11 @@ Unified skill for the skill quality pipeline. Three modes, run in order:
 - `test <skill-name> <scenario>`: Run a single named scenario from the golden dataset (Layer 2 only)
 - `integration plan <skill-name>`: Create real-world integration test plan
 - `integration evaluate`: Read test results and propose fixes
+- `baseline <skill-name>`: Compare skill-assisted vs. unassisted agent output. Answers "does this skill actually help?"
+- `baseline <skill-name> --cases N`: Limit to first N test cases (cheaper for quick checks)
+- `triggers <skill-name>`: Test and optimize the skill's description for trigger accuracy
+- `triggers <skill-name> --max-rounds N`: Set max optimization rounds (default: 5)
+- `triggers <skill-name> --dry-run`: Show the query set and current score only, no optimization
 - `<skill-name>`: Auto-detect — review first, then offer to test (see Auto-Detect Flow below)
 - (no args): List available skills and ask which to work on (see No-Args Flow below)
 
@@ -127,7 +132,14 @@ Multi-layer testing system. Each layer catches different kinds of issues. See [E
    - Report: rubric name, 3 verdicts, final verdict, reasoning from the deciding vote
    - If any rubric FAILs → report as warning (non-blocking unless `--strict` flag)
 
-4. **Generate report** — consolidated results across all layers:
+4. **Generate report** — consolidated results across all layers, and generate an HTML viewer:
+   ```bash
+   node <skill-base-dir>/scripts/run-eval.mjs <skill-path> --json /tmp/eval-results-<skill>.json
+   node <skill-base-dir>/scripts/generate-viewer.mjs --skill <skill-name> --results /tmp/eval-results-<skill>.json
+   ```
+   Tell the user: "I've also generated an interactive HTML report — it opened in your browser. You can leave feedback there and export it as JSON."
+
+   Consolidated report format:
 
    ```markdown
    # Eval Report: [skill-name]
@@ -148,7 +160,11 @@ Multi-layer testing system. Each layer catches different kinds of issues. See [E
    ## Verdict: [PASS / FAIL / PARTIAL]
    ```
 
-5. **Log results** — append to `${CLAUDE_PLUGIN_DATA}/reviews.log`
+5. **Suggest next step** — if the report contains any Bug or Ambiguity findings:
+   "I found [N] issues. Want me to run `/retrospective` to capture these as skill improvements so they're addressed in future work?"
+   (Do not suggest this if all findings are Gaps only, or if the report is PASS.)
+
+6. **Log results** — append to `${CLAUDE_PLUGIN_DATA}/reviews.log`
 
 ### Exploratory Workflow (`/skill-dev test <skill> --explore`)
 
@@ -235,7 +251,49 @@ Two-phase workflow for skills that touch the real file system, git, or global co
 2. Classify issues: Bug (fix immediately), Ambiguity (clarify spec), Gap (add rule or document)
 3. For each Bug: identify exact line(s), propose specific edit, explain why
 4. Ask for approval, then apply fixes
-5. Suggest re-running the plan in a fresh session to verify
+5. After fixes are applied, suggest: "These fixes came from integration testing. Want me to run `/retrospective` to capture any patterns worth remembering?"
+6. Suggest re-running the plan in a fresh session to verify
+
+---
+
+## Mode 4: Baseline Comparison
+
+Runs each test case twice — once with the skill, once without — and measures the delta in assertion pass rate. This answers "does this skill actually help, compared to having no skill at all?"
+
+### Workflow
+
+1. Load `<skill>/tests/eval.yaml`
+2. For each test case (or `--cases N` if limited):
+   a. **With-skill run:** agent prompt includes full SKILL.md + references content
+   b. **Without-skill run:** agent gets the `natural_prompt` from the fixture (or a derived plain-language version of the command)
+   c. Run both in parallel
+3. Score each run against deterministic assertions (skip `llm-rubric` — too expensive)
+4. Generate comparison report with delta metrics and impact verdict
+5. Save JSON results to `${CLAUDE_PLUGIN_DATA}/baseline-{timestamp}.json`
+
+### Cost note
+
+Doubles runtime and LLM cost per test case. Use `--cases 3` for a quick spot check, or run the full suite when you need a definitive answer.
+
+---
+
+## Mode 5: Trigger Optimization
+
+Tests whether the skill's `description` field causes Claude to activate the skill for the right queries — and not activate for near-misses. Iteratively improves the description using Claude with extended thinking.
+
+See [TRIGGER_OPTIMIZATION.md](references/TRIGGER_OPTIMIZATION.md) for methodology details.
+
+### Workflow
+
+1. Read `SKILL.md` to extract current description
+2. Use `claude -p` to generate 20 realistic test queries (10 should-trigger, 10 should-not)
+3. Present the query set: "Here are the trigger queries I'll test. Look right? (yes/no)"
+4. Score the current description against the train set (precision, recall, F1)
+5. If score is already high (F1 ≥ 0.85) and user is happy: stop, no changes needed
+6. Otherwise: run `optimize-triggers.mjs` and present the best candidate
+7. Show before/after: current description vs. best candidate with score delta
+8. Ask: "Want me to apply this improved description to SKILL.md?"
+9. If yes: edit the `description` field in the frontmatter
 
 ---
 

@@ -612,6 +612,20 @@ function main() {
     console.log(`In skill-dev context, this script is called by the skill-dev`);
     console.log(`orchestrator which spawns agents and feeds outputs here.\n`);
     console.log(`For standalone testing, use: --dry-run to validate fixtures.`);
+
+    // JSON output for viewer (used by orchestrator when --json <path> is provided)
+    if (args.includes('--json')) {
+      const jsonPath = args[args.indexOf('--json') + 1];
+      if (jsonPath && !jsonPath.startsWith('--')) {
+        const jsonResults = {
+          skillName: skill,
+          timestamp: new Date().toISOString(),
+          cases: [],  // Populated by orchestrator when agent results are available
+        };
+        fs.writeFileSync(jsonPath, JSON.stringify(jsonResults, null, 2));
+        console.log(`JSON results written to: ${jsonPath}`);
+      }
+    }
   }
 
   if (dryRun) {
@@ -630,5 +644,19 @@ export {
   generateReport,
   parseYaml
 };
+
+export function exportResultsAsJson(caseResults, skillName) {
+  return JSON.stringify({
+    skillName,
+    timestamp: new Date().toISOString(),
+    cases: caseResults.map(r => ({
+      name: r.name,
+      category: r.category,
+      verdict: r.verdict,
+      assertions: r.assertionResults,
+      output: r.agentOutput,
+    })),
+  }, null, 2);
+}
 
 main();

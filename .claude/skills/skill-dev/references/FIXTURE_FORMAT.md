@@ -89,6 +89,19 @@ Tests a specific decision point in the skill's logic:
 
 The eval runner spawns a read-only agent that traces through the decision and reports Input → Rule → Result. The assertion checks that the result matches.
 
+### Optional fields
+
+- `natural_prompt` (string): Plain-language version of the test prompt, used by baseline comparison mode. This is what a user would type without knowing the skill exists.
+
+  **Example:**
+  ```yaml
+  inputs:
+    command: "/skill-dev review commit"
+    natural_prompt: "Review the commit skill and tell me if there are any quality issues with it"
+  ```
+
+  If omitted, baseline mode derives a natural prompt from the command automatically. Providing it explicitly gives better baseline results — the derived version may be too literal.
+
 ## Naming Conventions
 
 - File: `tests/eval.yaml` inside each skill directory
