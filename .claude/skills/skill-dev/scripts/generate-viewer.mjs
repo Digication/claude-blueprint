@@ -55,8 +55,8 @@ function main() {
   let template = readFileSync(templatePath, 'utf8');
 
   template = template
-    .replace('__SKILL_NAME__', data.skillName)
-    .replace('__TIMESTAMP__', new Date(data.timestamp).toLocaleString())
+    .replaceAll('__SKILL_NAME__', data.skillName)
+    .replaceAll('__TIMESTAMP__', new Date(data.timestamp).toLocaleString())
     .replace('/*__EMBEDDED_DATA__*/', `const DATA = ${JSON.stringify(data)};`);
 
   writeFileSync(outputPath, template);

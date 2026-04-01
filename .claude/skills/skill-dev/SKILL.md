@@ -133,10 +133,30 @@ Multi-layer testing system. Each layer catches different kinds of issues. See [E
    - If any rubric FAILs → report as warning (non-blocking unless `--strict` flag)
 
 4. **Generate report** — consolidated results across all layers, and generate an HTML viewer:
-   ```bash
-   node <skill-base-dir>/scripts/run-eval.mjs <skill-path> --json /tmp/eval-results-<skill>.json
-   node <skill-base-dir>/scripts/generate-viewer.mjs --skill <skill-name> --results /tmp/eval-results-<skill>.json
+
+   Write the collected results to a JSON file using the Write tool:
+   ```json
+   {
+     "skillName": "<skill-name>",
+     "timestamp": "<ISO timestamp>",
+     "cases": [
+       {
+         "name": "<case name>",
+         "description": "<what this case tests — from eval.yaml>",
+         "category": "<category>",
+         "verdict": "PASS|FAIL|PARTIAL",
+         "notes": "<1-2 sentence result summary: key decision made, assertion outcome, or why it failed>",
+         "output": "<agent output summary>",
+         "assertions": [{ "passed": true, "type": "contains", "evidence": "..." }]
+       }
+     ]
+   }
    ```
+   Write to `$TMPDIR/eval-results-<skill>.json`, then run:
+   ```bash
+   node <skill-base-dir>/scripts/generate-viewer.mjs --skill <skill-name> --results $TMPDIR/eval-results-<skill>.json
+   ```
+   The script auto-opens the report in the browser — do not run `open` separately.
    Tell the user: "I've also generated an interactive HTML report — it opened in your browser. You can leave feedback there and export it as JSON."
 
    Consolidated report format:

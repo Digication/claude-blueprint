@@ -8,10 +8,14 @@
  * and checks deterministic + LLM-judge assertions against the output.
  *
  * Usage:
- *   node run-eval.mjs --skill <name>              # Run all layers for a skill
+ *   node run-eval.mjs --skill <name>              # Validate fixtures (dry-run only when standalone)
  *   node run-eval.mjs --skill <name> --layer 2    # Run only Layer 2 (deterministic)
  *   node run-eval.mjs --skill <name> --dry-run    # Validate fixtures only
- *   node run-eval.mjs --all                       # Run all skills with fixtures
+ *   node run-eval.mjs --all --dry-run             # Validate all skills' fixtures
+ *
+ * Note: This script validates fixtures and exports assertion utilities.
+ * Agent execution (Layer 2/3) is orchestrated by the skill-dev conversation,
+ * which collects outputs and writes JSON for generate-viewer.mjs directly.
  */
 
 import fs from 'fs';

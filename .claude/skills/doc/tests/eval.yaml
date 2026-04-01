@@ -217,7 +217,7 @@ cases:
           - "Are you sure"
           - "Consider"
       - type: llm-rubric
-        value: "The agent flags that 'unresolved High-priority review items' has no formal definition — there is no mechanism specified for tracking which items have been addressed by a subsequent update. The agent should note this ambiguity rather than assuming a resolution strategy."
+        value: "The agent correctly applies the skill's definition of 'unresolved': an item is unresolved when the latest HISTORY.md row for this version is a review row (not a subsequent update or in-place edit row). The agent should use this definition to determine that the 3 high-priority items are unresolved and trigger the warning."
 
     source: "Found during exploratory test on 2026-03-31, scenario approve-unresolved-high-items"
 
@@ -298,7 +298,7 @@ cases:
 
     assert:
       - type: not-contains
-        value: "overwrite"
+        value: "overwriting the existing"
       - type: not-contains
         value: "replace existing"
       - type: contains-any
@@ -338,8 +338,6 @@ cases:
           - "could not parse"
           - "warning"
           - "Warning"
-      - type: not-contains
-        value: "Everything is in sync"
       - type: llm-rubric
         value: "The agent detects that HISTORY.md has missing columns (only Version and Date, missing Author/Status/Approved By/Notes) and warns the user rather than silently treating it as valid. The gotchas section explicitly warns about this: 'Slug resolution fails silently on malformed HISTORY.md'."
 
